@@ -1,0 +1,9 @@
+school_name,district,taluk,reporter_role,issue_description,has_photo,has_gps
+Government Primary School,Shivamogga,Bhadravathi,Headmaster,"The student toilet is completely blocked and water sanitation pipelines are leaking, making the facility unusable.",True,True
+Government High School,Shivamogga,Sagar,Village Volunteer,"There is no drinking water filter or working borewell connection. Students are bringing water from home or drinking untreated water.",True,False
+Zilla Panchayat School,Chikkamagaluru,Koppa,Student Representative,"Only one teacher is present for classes 1 to 5. The other three staff members are absent or on long-term transfer.",False,False
+Government Middle School,Hassan,Belur,Headmaster,"The classroom building roof is leaking heavily during rain, leading to water accumulation and wall dampness.",True,True
+Town Primary School,Tumakuru,Madhugiri,Village Volunteer,"The classroom fan and tube light wiring has caught fire. There is currently no electricity in the entire secondary wing.",False,True
+Government High School,Chikkamagaluru,Mudigere,Student Representative,"A large crack has formed on the classroom wall and the structural plaster is falling down, creating an unsafe environment for children.",True,True
+Zilla Panchayat High School,Hassan,Arsikere,Village Volunteer,"Classroom benches and desks are completely broken. Many students have to sit on the cold floor to study.",False,False
+Government Girls School,Tumakuru,Tiptur,Headmaster,"Repeated sanitation issue: the septic tank is overflowing into the playground, creating a major health hazard.",True,True
