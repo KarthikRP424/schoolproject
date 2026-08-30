@@ -1,181 +1,243 @@
-# AI School Issue Monitoring and Priority Agent
+# 🏫 Smart Government School Monitoring and Early-Warning System for Karnataka
 
-A beginner-friendly, offline decision support system for government school monitoring. This project demonstrates how rule-based AI agents can solve critical administrative challenges in public education without requiring paid APIs or internet access.
+**Better Schools. Smarter Decisions. Stronger Communities.**
 
----
-
-## 1. Project Overview
-The **AI School Issue Monitoring and Priority Agent** is a Streamlit-based web application that acts as an intelligent router and decision support assistant. It accepts report logs of school issues submitted by headmasters, village volunteers, student representatives, or education officers. It classifies the category, assigns a priority score (0–100) and urgency level, assesses risk/credibility, and outputs an actionable next step alongside a copy-paste-ready officer brief.
+A production-quality prototype capstone project that digitises the end-to-end school issue lifecycle for the Karnataka State Education Department.
 
 ---
 
-## 2. Problem Statement
-In large government school networks (such as those in Karnataka), departments receive thousands of complaints ranging from minor furniture issues to critical safety hazards. 
-* **The Bottle-Neck:** Manually sorting, classifying, and prioritizing these reports is slow, leading to delayed action on dangerous hazards.
-* **Connectivity Hurdles:** Many rural blocks have unstable internet, making heavy cloud-based AI solutions (like OpenAI or Anthropic APIs) expensive, slow, and unreliable.
-* **Decision Fatigue:** Education officers need structured summaries and clear action guidelines rather than raw, unstructured feedback to make fast decisions.
+## 🗺️ System Overview
+
+```
+Report → Evidence → Verification → Priority → Assignment
+       → Inspection → Action → Student Verification → Closure → Analytics
+```
+
+The platform connects **school-level reporters** (Headmasters, Students, Volunteers) with **district and state officers** through a single persistent monitoring dashboard backed by a local SQLite database.
 
 ---
 
-## 3. Why This Project Belongs to "Agents for Good"
-This project falls directly under the **Agents for Good** track because it:
-* **Promotes Educational Equity:** By accelerating repairs of toilets, water supplies, and structures, it ensures students (especially girls) remain in school in a safe environment.
-* **Is Accessible to Underserved Areas:** By running 100% offline, it allows low-budget local administrations to utilize decision support technology without software licensing costs.
-* **Empowers Local Voices:** It provides students, volunteers, and teachers a direct pathway to get issues noticed based on objective severity rules rather than bureaucratic connections.
+## 👥 Demo Credentials
+
+| Role | Username | Password | Scope |
+|------|----------|----------|-------|
+| **Headmaster** | `headmaster_rampura` | `Head@123` | GHPS Rampura, Shivamogga |
+| **Headmaster** | `headmaster_sagar` | `Head@456` | GHS Sagar, Shivamogga |
+| **Headmaster** | `headmaster_mudigere` | `Head@789` | GHS Mudigere, Chikkamagaluru |
+| **Student Representative** | `student_rampura` | `Stu@123` | GHPS Rampura |
+| **Student Representative** | `student_sagar` | `Stu@456` | GHS Sagar |
+| **Village Volunteer** | `volunteer_rampura` | `Vol@123` | Rampura Village |
+| **Village Volunteer** | `volunteer_sagar` | `Vol@456` | Sagar Village |
+| **District Education Officer** | `officer_shivamogga` | `Off@123` | Shivamogga District |
+| **State Official** | `officer_state` | `State@123` | All Karnataka |
+
+> ⚠️ These are **synthetic demo credentials** for prototype use only. No real personal data is stored.
 
 ---
 
-## 4. Agent Workflow
-The agent performs its analysis sequentially:
-1. **Input Ingestion:** Accepts school name, district, taluk, reporter role, raw description, and evidence checks (photo upload / GPS coordinates).
-2. **Category Classification:** Scans for keywords in the description to sort reports into *Sanitation*, *Drinking Water*, *Teacher Shortage*, *Infrastructure*, *Electricity*, or *General Issue*.
-3. **Scoring Engine:** Calculates a priority score starting from a baseline of 40, applying weighted adjustments based on category severity, urgency phrases, reporter credibility, and evidence.
-4. **Credibility Audit:** Cross-references description length and evidence checkboxes to flag high, medium, or low fake/duplicate risks.
-5. **Action Generation:** Maps the final category and priority level to an official next step.
-6. **Brief Generation:** Assembles a structured, copy-paste-ready report summarizing the entire case.
+## 🚀 How to Run Locally
 
----
+### Prerequisites
 
-## 5. Automatic Report Flow
-This prototype features a live, session-based workflow connecting school reporters directly to administration officials:
-* **Submission:** Headmasters, Student Representatives, and Village Volunteers submit reports.
-* **Local Processing:** The report description is run locally through the AI agent to assign categories, scores, urgency flags, and recommended action steps.
-* **Database Appending:** The analyzed report, containing its unique ID (e.g., `RPT-0001`) and submission time, is stored directly into the shared `st.session_state["reports"]` list.
-* **Officer Dashboard:** Government Officers logging in will immediately see new reports under their jurisdiction. 
-* **Alerts & Updates:** Officers see automatic **Urgent Alerts** (reports with Urgent priority) and **Dangerous School Alerts** (schools flagged with hazardous problems), and they can update report status (e.g., from *Pending* to *Under Review* or *Resolved*), which updates the system state dynamically.
-* **Session Storage:** All submissions and status updates persist during the current Streamlit session. They reset to defaults when the server restarts.
+- Python 3.9+ (tested on Python 3.11)
+- pip
 
----
+### Setup
 
-## 6. Demo Login Credentials
-
-This prototype is equipped with pre-loaded demo users representing different administrative roles and access levels.
-
-| Role | Username | Password | School / Jurisdiction |
-|------|----------|----------|---------------------|
-| **Headmaster** | `headmaster_rampura` | `Head@123` | GHPS Rampura (Bhadravathi Taluk, Shivamogga) |
-| **Headmaster** | `headmaster_sagar` | `Head@456` | GHS Sagar (Sagar Taluk, Shivamogga) |
-| **Student Rep** | `student_rampura` | `Stu@123` | GHPS Rampura (Bhadravathi Taluk, Shivamogga) |
-| **Student Rep** | `student_sagar` | `Stu@456` | GHS Sagar (Sagar Taluk, Shivamogga) |
-| **Village Volunteer** | `volunteer_rampura` | `Vol@123` | GHPS Rampura (Bhadravathi Taluk, Shivamogga) |
-| **Village Volunteer** | `volunteer_sagar` | `Vol@456` | GHS Sagar (Sagar Taluk, Sagar) |
-| **Govt Officer** | `officer_shivamogga` | `Off@123` | Shivamogga District reports only |
-| **Govt Officer** | `officer_state` | `State@123` | All District reports (State-wide view) |
-
----
-
-## 7. Password Reset Feature
-* **Reset Interface:** Users can check the **"Forgot / Reset Password"** checkbox on the login page to open the reset form.
-* **Rules:** The username must exist in the database, passwords must match, and the new password must be at least **6 characters** long.
-* **Scope:** Because this is a lightweight web prototype, password changes are **session-based**. They are temporarily saved in `st.session_state` and will reset back to default when the Streamlit server restarts.
-* **Security:** No external databases, email servers, or API keys are required.
-
----
-
-## 8. Features
-* **Interactive Submission Form:** Auto-fills school profiles (name, district, taluk, village) from the reporter's user profile, allowing user edits.
-* **Evidence Upload Support:** Live file uploading for photo evidence and coordinate tracking for GPS verification.
-* **Officer Portal:** Access-controlled reports log table with total and priority metrics summary charts.
-* **Live AI Assessment:** Immediate generation of priority level, score, risk, and action steps.
-* **One-Click Download:** Allows officers to download the generated text summary directly to their local computers.
-
----
-
-## 9. No API Key Design
-* **100% Local Logic:** This project does not use any external API keys, paid models, LLM APIs, or secret credentials.
-* **Privacy & Cost:** Safe from credit depletion, rate limits, or network timeouts.
-* **Reproducibility:** It is fully reproducible locally, in a Kaggle Notebook, or inside a simple sandboxed environment.
-
----
-
-## 10. Tech Stack
-* **Python:** Core programming language.
-* **Streamlit:** Fast, lightweight framework for building web interfaces.
-* **Pandas:** Used for loading, parsing, and rendering the pre-loaded CSV dataset.
-
----
-
-## 11. How to Run
-
-### Step 1: Install Python
-Ensure Python 3.9+ is installed on your computer.
-
-### Step 2: Install Dependencies
-Open your terminal or command prompt in the project directory and run:
 ```bash
+# Clone or download the project folder
+cd schoolproject
+
+# Install dependencies (no virtual environment required for demo)
 pip install -r requirements.txt
+
+# Run the app
+python -m streamlit run app.py
 ```
 
-### Step 3: Launch the Application
-Run the following command to start the local web server:
+The app will open automatically at **http://localhost:8501**
+
+---
+
+## 🌐 How to Share the App
+
+### Method 1 — Share on the Same Wi-Fi Network
+
+Run the server so it listens on all network interfaces:
+
 ```bash
-streamlit run app.py
+python -m streamlit run app.py --server.address 0.0.0.0
+```
+
+Then find your laptop's local IP address:
+
+```powershell
+ipconfig
+# Look for: IPv4 Address e.g. 192.168.1.5
+```
+
+Anyone on the **same Wi-Fi** can open:
+
+```
+http://YOUR-LAPTOP-IP:8501
+```
+
+Example: `http://192.168.1.5:8501`
+
+> ⚠️ **Important:** `localhost` only works on the computer running the app.  
+> Other devices must use your laptop's IP address.
+
+---
+
+### Method 2 — Public Deployment via Streamlit Community Cloud
+
+1. Push this project to a **GitHub repository**
+2. Go to [https://streamlit.io/cloud](https://streamlit.io/cloud)
+3. Click **New App**
+4. Select your **GitHub repository**
+5. Set the **main file** to `app.py`
+6. Click **Deploy**
+7. Share the generated public `*.streamlit.app` link
+
+> The SQLite database file (`school_monitoring.db`) will be created on first run and seeded automatically with all demo data.
+
+---
+
+## 🏗️ Project Architecture
+
+```
+schoolproject/
+├── app.py                          # Main entrypoint & routing
+├── config.py                       # Constants, SLA hours, weights
+├── requirements.txt
+│
+├── database/
+│   ├── connection.py               # SQLite context manager (row_factory)
+│   ├── models.py                   # 13-table schema + initialize_database()
+│   └── seed.py                     # Idempotent seeder with scenarios A–H
+│
+├── auth/
+│   ├── authentication.py           # PBKDF2-HMAC-SHA256 login & reset
+│   └── permissions.py              # RBAC scope filter SQL builders
+│
+├── services/
+│   ├── issue_service.py            # CRUD, duplicate detection, SLA
+│   ├── verification_service.py     # Confidence scoring, conflict detection
+│   ├── priority_engine.py          # Health, Priority, Decline Risk scores
+│   ├── notification_service.py     # In-app alert delivery
+│   ├── inspection_service.py       # Inspection log management
+│   └── audit_service.py            # Immutable audit trail
+│
+├── components/
+│   ├── charts.py                   # Enrollment, attendance, score trends
+│   ├── maps.py                     # Priority-coloured coordinate maps
+│   └── timelines.py                # Issue lifecycle & audit visualisers
+│
+├── dashboards/
+│   ├── school.py                   # Headmaster / Student Rep / Volunteer view
+│   ├── district.py                 # District Education Officer view
+│   ├── taluk.py                    # Taluk Education Officer view
+│   └── state.py                    # State-level analytics command centre
+│
+├── tests/
+│   └── test_flow.py                # 8 automated tests (DB, auth, logic)
+│
+└── data/
+    └── sample_reports.csv          # Legacy sample data
 ```
 
 ---
 
-## 12. How to Share the App
+## 🔐 Security Design
 
-> [!WARNING]
-> **Important sharing note:** By default, running Streamlit using `localhost` works only on your own computer. Other users cannot open `localhost` from their own mobile phones, tablets, or separate laptops.
-
-To share your app with others, use one of the two methods below:
-
-### Method A: Share on the Same Wi-Fi Network
-If you and your classmates or colleagues are connected to the same Wi-Fi network:
-1. Run this command in your terminal:
-   ```bash
-   streamlit run app.py --server.address 0.0.0.0
-   ```
-2. Find your laptop's IP address (e.g. `192.168.1.5` on Windows using `ipconfig`, or look at the Network URL shown in the command terminal output).
-3. Tell other users to open their web browsers on their phones or laptops and go to:
-   `http://YOUR-LAPTOP-IP:8501` (Example: `http://192.168.1.5:8501`)
-
-### Method B: Deploy Publicly using Streamlit Community Cloud
-To make your app public so anyone in the world can access it via a link:
-1. **Push your project to GitHub:** Create a new repository on GitHub and upload all the project files (`app.py`, `agent.py`, `requirements.txt`, the `data/` folder, etc.).
-2. **Go to Streamlit Community Cloud:** Visit [share.streamlit.io](https://share.streamlit.io/) and log in with your GitHub account.
-3. **Deploy the app:**
-   - Click the **"New app"** button.
-   - Select your repository, branch, and set `app.py` as the main file path.
-   - Click **"Deploy!"**
-4. **Share the link:** Once Streamlit finishes building, copy the generated public URL and share it with your team!
+| Feature | Implementation |
+|---------|---------------|
+| Password hashing | PBKDF2-HMAC-SHA256, 100,000 iterations, unique 16-byte salt per user |
+| Credential comparison | `hmac.compare_digest()` — timing-attack resistant |
+| No external auth service | 100% Python stdlib (`hashlib`, `hmac`, `os.urandom`) |
+| Role-Based Access Control | SQL `WHERE` clauses scoped per role at query time |
+| Audit trail | Immutable `audit_logs` table — every status change logged |
+| No API keys | Zero external credentials required |
 
 ---
 
-## 13. Example Input and Output
+## 📊 Scoring Engines
 
-### Input
-* **School Name:** Government Primary School
-* **District:** Shivamogga
-* **Taluk:** Bhadravathi
-* **Reporter Role:** Headmaster
-* **Description:** "The student toilet is completely blocked and water sanitation pipelines are leaking, making the facility unusable."
-* **Evidence:** Photo evidence uploaded, GPS coordinates = `12.9716, 77.5946`
+### Priority Score (0–100)
+| Component | Weight |
+|-----------|--------|
+| Teacher Shortage | 25% |
+| Infrastructure Condition | 25% |
+| Basic Facilities (water/toilets) | 20% |
+| Enrollment Decline | 15% |
+| Unresolved Open Issues | 15% |
 
-### Output
-* **Category:** Sanitation
-* **Priority Level:** Urgent
-* **Priority Score:** 95/100
-* **Fake Risk:** Low Risk
-* **Verification Status:** Report has enough supporting details
-* **Recommended Action:** Deploy sanitation crew for emergency repair and cleanup of school washrooms within 24 hours.
-* **Summary Text:**
-  ```markdown
-  School: Government Primary School in Bhadravathi Taluk, Shivamogga District.
-  Issue Category: Sanitation (Urgency: Urgent, Priority Score: 95/100).
-  Verification Status: Low Risk — Report has enough supporting details.
-  Recommended Action: Deploy sanitation crew for emergency repair and cleanup of school washrooms within 24 hours.
-  ```
+**Levels:** LOW → MODERATE → HIGH → CRITICAL → EMERGENCY
+
+### Verification Confidence (0–100)
+| Role | Weight |
+|------|--------|
+| Headmaster confirmation | 30% |
+| Student Representative | 30% |
+| Village Volunteer | 20% |
+| Photo + GPS Evidence | 20% |
+
+**Conflict detection:** If any role confirms while another denies → 30-point penalty + District Officer alert.
+
+### School Decline Risk (0–100%)
+| Indicator | Weight |
+|-----------|--------|
+| Multi-year enrollment drop | 40% |
+| Attendance below 85% | 30% |
+| Teacher vacancy | 20% |
+| Unresolved complaints | 10% |
 
 ---
 
-## 14. Future Scope
-* **Database Integration:** Move from static CSVs to a lightweight SQLite database to save live submissions.
-* **Speech-to-Text:** Allow rural reporters to dictate complaints in regional languages (e.g., Kannada) and translate them locally.
-* **Offline Mapping:** Render GPS locations on offline maps for education officers planning field visits.
+## 🗄️ Pre-Seeded Demo Scenarios
+
+| ID | Scenario | Status |
+|----|----------|--------|
+| A | Toilet blockage → Verified → Repaired → **Student Approved** (Closed) | ✅ Closed |
+| B | Drinking water dispute → **Conflict Detected** (HM vs. Students) | ⚠️ Inspection Required |
+| C | Unsafe ceiling cracks → **Emergency** (24h SLA) | 🛑 Pending |
+| D | GHS Sagar declining enrolment → **Early Warning Alert** | 📉 Monitoring |
+| F | Duplicate infrastructure report detected | 🔁 Under Review |
+| G | Electricity outage → **SLA Expired** → Escalated | ⏰ Escalated |
+| H | Action marked complete → **Student rejects** closure | ❌ Reopened |
 
 ---
 
-## 15. Conclusion
-The **AI School Issue Monitoring and Priority Agent** demonstrates that effective, impactful decision support systems do not require complex neural networks or expensive cloud credits. By utilizing smart rule-based logic and lightweight interface tools like Streamlit, we can create secure, robust, and localized solutions that make a tangible difference in public education management.
+## 🔬 Running Tests
+
+```bash
+python -m unittest tests/test_flow.py -v
+```
+
+Expected output: **8/8 tests pass** covering database initialization, PBKDF2 hashing, authentication, password reset, priority scoring, decline risk, and verification conflict logic.
+
+---
+
+## 📍 Karnataka Geography Covered
+
+| District | Taluks | Schools |
+|----------|--------|---------|
+| Shivamogga | Bhadravathi, Sagar, Soraba | 8 schools |
+| Chikkamagaluru | Koppa, Mudigere, Tarikere | 6 schools |
+| Hassan | Belur, Arsikere, Sakleshpur | 6 schools |
+
+**Total:** 20 schools · 15 demo users · 6 pre-seeded issue scenarios
+
+---
+
+## 🎓 Interview Discussion Points
+
+This prototype demonstrates:
+
+- **Database design** — normalised 13-table SQLite schema with FK constraints
+- **RBAC** — role-scoped SQL queries dynamically built per login session
+- **Service-layer architecture** — business logic cleanly separated from UI
+- **Decision logic** — rule-based AI agent + weighted scoring engines
+- **Auditability** — immutable audit log trail on every state change
+- **Analytics** — health scores, decline risk, budget allocation calculator
+- **Security** — PBKDF2-HMAC-SHA256 without external auth dependencies
