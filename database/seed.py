@@ -147,19 +147,27 @@ def seed_demo_data():
                 }
             trend_json = json.dumps(trend)
 
+            # Calculate expanded teacher metrics
+            sanctioned = school[9]
+            available = school[10]
+            absent = 1 if school[0] in ["Government High School, Sagar", "Government High School, Mudigere", "Zilla Panchayat School, Koppa"] else 0
+            present = max(0, available - absent)
+
             cursor.execute(
                 """
                 INSERT INTO schools (
                     name, district, taluk, village, latitude, longitude, school_type,
                     num_students, num_teachers, required_teachers, available_teachers,
+                    sanctioned_teachers, present_teachers, absent_teachers,
                     attendance_pct, health_score, priority_score, decline_risk, priority_level,
                     facility_status_json, enrollment_trend_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     school[0], school[1], school[2], school[3], school[4], school[5], school[6],
-                    school[7], school[8], school[9], school[10], school[11], school[12], school[13],
-                    school[14], school[15], facility_json, trend_json
+                    school[7], school[8], school[9], school[10],
+                    sanctioned, present, absent,
+                    school[11], school[12], school[13], school[14], school[15], facility_json, trend_json
                 )
             )
             school_id = cursor.lastrowid
@@ -242,6 +250,23 @@ def seed_demo_data():
                 (username, pwd_hash, salt, role, sch_id, dist, tal, vil)
             )
             user_id_map[username] = cursor.lastrowid
+
+        # Dynamically seed 5 unique Student Representatives for every school
+        for name, sid, dist, tal, vil in inserted_schools:
+            for i in range(1, 6):
+                username = f"student_rep_{sid}_{i}"
+                pwd = "Stu@123"
+                pwd_hash, salt = hash_password(pwd)
+                
+                cursor.execute("SELECT id FROM users WHERE username = ?;", (username,))
+                if not cursor.fetchone():
+                    cursor.execute(
+                        """
+                        INSERT INTO users (username, password_hash, salt, role, school_id, district, taluk, village)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                        """,
+                        (username, pwd_hash, salt, "Student Representative", sid, dist, tal, vil)
+                    )
 
         # ─────────────────────────────────────────────────────────────────────
         # SEED 3: DEMO SCENARIOS (A to H)

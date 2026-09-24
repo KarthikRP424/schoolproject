@@ -9,6 +9,7 @@ import pandas as pd
 from database.connection import execute_query
 from services.issue_service import get_filtered_issues, update_issue_status
 from services.inspection_service import create_inspection
+from services.sla_service import check_and_escalate_sla
 from services.notification_service import get_unread_notifications, mark_notification_as_read
 from components.maps import draw_schools_map
 from components.timelines import draw_issue_status_timeline, draw_evidence_timeline, draw_audit_trail_timeline
@@ -21,6 +22,12 @@ def render_district_dashboard(user_profile: dict):
     district = user_profile.get("district")
     st.title(f"🏛️ District Education Command Center: {district}")
     st.write(f"Welcome, District Officer. Displaying monitoring data for **{district} District** schools.")
+
+    # Run SLA escalation check (prototype — dashboard-triggered)
+    sla_result = check_and_escalate_sla()
+    if sla_result["escalated"]:
+        st.warning(f"⏰ **SLA Alert:** {sla_result['total_breached']} overdue issue(s) in your district. "
+                   f"{len(sla_result['escalated'])} escalated to higher authority.")
 
     # Load notifications for this role
     notifications = get_unread_notifications(user_profile)

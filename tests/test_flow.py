@@ -194,5 +194,99 @@ class TestSchoolMonitoringSystem(unittest.TestCase):
         self.assertEqual(c, 10.0)
         self.assertEqual(s, "Review Required")
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # 5. PHASE 2 FEATURE CHECKS
+    # ─────────────────────────────────────────────────────────────────────────
+    def test_workflow_transitions(self):
+        """
+        Verifies workflow state transition validation rules.
+        """
+        from services.issue_service import is_valid_transition
+        self.assertTrue(is_valid_transition("REPORTED", "VERIFIED"))
+        self.assertFalse(is_valid_transition("REPORTED", "CLOSED"))
+        self.assertTrue(is_valid_transition("ACTION_COMPLETED", "STUDENT_VERIFICATION"))
+        self.assertTrue(is_valid_transition("STUDENT_VERIFICATION", "CLOSED"))
+        self.assertTrue(is_valid_transition("CLOSED", "REOPENED"))
+        self.assertFalse(is_valid_transition("MERGED", "VERIFIED"))
+
+    def test_sla_escalation(self):
+        """
+        Verifies SLA calculation and escalation cascade.
+        """
+        from services.sla_service import check_and_escalate_sla, get_sla_status_for_issue
+        
+        # Test SLA calculation for issue
+        issue = execute_query("SELECT * FROM issues LIMIT 1;", fetch="one")
+        sla_info = get_sla_status_for_issue(issue)
+        self.assertIn("status", sla_info)
+        self.assertIn("label", sla_info)
+
+        # Test SLA escalation runner
+        res = check_and_escalate_sla()
+        self.assertIn("total_breached", res)
+        self.assertIn("escalated", res)
+
+    def test_student_consensus_voting(self):
+        """
+        Verifies 3/5 student representative consensus voting rules.
+        """
+        from services.inspection_service import submit_student_consensus
+        
+        school = execute_query("SELECT id FROM schools LIMIT 1;", fetch="one")
+        school_id = school["id"]
+        
+        # Create issue and transition to STUDENT_VERIFICATION
+        issue_res = create_issue(
+            school_id=school_id,
+            reporter_id=1,
+            reporter_role="Headmaster",
+            description="Fix tap water pipeline.",
+            has_photo=False,
+            has_gps=False
+        )
+        issue_id = issue_res["id"]
+        execute_query("UPDATE issues SET status = 'STUDENT_VERIFICATION' WHERE id = ?;", (issue_id,))
+
+        # Fetch student reps for this school
+        student_reps = execute_query("SELECT id FROM users WHERE school_id = ? AND role = 'Student Representative' LIMIT 3;", (school_id,))
+        self.assertGreaterEqual(len(student_reps), 3)
+
+        # Vote 1 (Approve) -> Pending
+        res1 = submit_student_consensus(issue_id, student_reps[0]["id"], approves=True)
+        self.assertEqual(res1["action"], "PENDING")
+
+        # Vote 2 (Approve) -> Pending
+        res2 = submit_student_consensus(issue_id, student_reps[1]["id"], approves=True)
+        self.assertEqual(res2["action"], "PENDING")
+
+        # Vote 3 (Approve) -> 3/5 Majority reached -> CLOSED
+        res3 = submit_student_consensus(issue_id, student_reps[2]["id"], approves=True)
+        self.assertEqual(res3["action"], "CLOSED")
+        
+        # Check DB state
+        updated_issue = execute_query("SELECT status FROM issues WHERE id = ?;", (issue_id,), fetch="one")
+        self.assertEqual(updated_issue["status"], "CLOSED")
+
+    def test_duplicate_merging(self):
+        """
+        Verifies merging duplicate issues.
+        """
+        from services.issue_service import merge_duplicate_issues
+        
+        school = execute_query("SELECT id FROM schools LIMIT 1;", fetch="one")
+        school_id = school["id"]
+        
+        master = create_issue(school_id, 1, "Headmaster", "Broken toilet door in block A", False, False)
+        dup = create_issue(school_id, 2, "Student Representative", "Broken toilet door in block A", False, False)
+        
+        user_profile = {"id": 1, "role": "System Administrator", "district": "Shivamogga"}
+        success = merge_duplicate_issues(dup["id"], master["id"], user_profile)
+        self.assertTrue(success)
+
+        dup_issue = execute_query("SELECT status, parent_issue_id FROM issues WHERE id = ?;", (dup["id"],), fetch="one")
+        self.assertEqual(dup_issue["status"], "MERGED")
+        self.assertEqual(dup_issue["parent_issue_id"], master["id"])
+
 if __name__ == "__main__":
     unittest.main()
+

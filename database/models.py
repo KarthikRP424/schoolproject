@@ -27,6 +27,9 @@ def initialize_database():
             num_teachers INTEGER NOT NULL,
             required_teachers INTEGER NOT NULL,
             available_teachers INTEGER NOT NULL,
+            sanctioned_teachers INTEGER DEFAULT 0,
+            present_teachers INTEGER DEFAULT 0,
+            absent_teachers INTEGER DEFAULT 0,
             attendance_pct REAL NOT NULL,
             enrollment_trend_json TEXT,  -- JSON string of {year: student_count}
             facility_status_json TEXT,   -- JSON string of {facility: status}
@@ -76,8 +79,11 @@ def initialize_database():
             assignment TEXT NULL,
             resolution_deadline TEXT NOT NULL,
             is_escalated INTEGER DEFAULT 0,
+            escalation_level INTEGER DEFAULT 0,
+            parent_issue_id INTEGER NULL,
             FOREIGN KEY (school_id) REFERENCES schools(id),
-            FOREIGN KEY (reporter_id) REFERENCES users(id)
+            FOREIGN KEY (reporter_id) REFERENCES users(id),
+            FOREIGN KEY (parent_issue_id) REFERENCES issues(id)
         );
         """,
 
@@ -220,5 +226,11 @@ def initialize_database():
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        import config
         for statement in tables:
+            if config.DB_TYPE == "mysql":
+                # Translate DDL parameters for MySQL compatibility
+                statement = statement.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "INT AUTO_INCREMENT PRIMARY KEY")
+                statement = statement.replace("REAL", "DOUBLE")
+                statement = statement.replace("TEXT", "LONGTEXT")
             cursor.execute(statement)

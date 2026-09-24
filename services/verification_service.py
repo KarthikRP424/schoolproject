@@ -149,11 +149,33 @@ def recalculate_verification_confidence(issue_id: int) -> tuple[float, str, bool
         else:
             v_status = "Low Confidence"
 
-    # Update database state
+    # Update database verification state
     execute_query(
         "UPDATE issues SET verification_confidence = ?, verification_status = ? WHERE id = ?;",
         (confidence, v_status, issue_id),
         fetch="rowcount"
     )
+
+    # Perform issue status transition if currently in REPORTED status
+    current = execute_query("SELECT report_id, status FROM issues WHERE id = ?;", (issue_id,), fetch="one")
+    if current and current["status"] in ["REPORTED", "Pending"]:
+        target_status = None
+        if conflict_detected:
+            target_status = "UNDER_REVIEW"
+        elif v_status in ["Verified", "Highly Verified"]:
+            target_status = "VERIFIED"
+            
+        if target_status and target_status != current["status"]:
+            # Perform transition
+            execute_query("UPDATE issues SET status = ? WHERE id = ?;", (target_status, issue_id), fetch="rowcount")
+            # Log transition to audit trails (user_id=0 → resolved as 'System' inside audit_service)
+            log_audit_event(
+                user_id=None,
+                action="AUTO_STATUS_TRANSITION",
+                entity_type="issue",
+                entity_id=current["report_id"],
+                prev_value=current["status"],
+                new_value=target_status
+            )
 
     return confidence, v_status, conflict_detected

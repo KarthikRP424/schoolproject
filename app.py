@@ -12,6 +12,7 @@ from dashboards.school import render_school_dashboard
 from dashboards.district import render_district_dashboard
 from dashboards.taluk import render_taluk_dashboard
 from dashboards.state import render_state_dashboard
+from dashboards.admin import render_admin_dashboard
 
 # ─────────────────────────────────────────────────────────────────────────────
 # APP CONFIGURATION
@@ -83,7 +84,7 @@ def render_login_page():
         st.markdown("---")
         
         # Toggle: Login vs. Forgot Password
-        page_mode = st.radio("", ["Login", "Reset Password"], horizontal=True, label_visibility="collapsed")
+        page_mode = st.radio("Select Action", ["Login", "Reset Password"], horizontal=True, label_visibility="collapsed")
         
         if page_mode == "Login":
             with st.form("login_form"):
@@ -226,8 +227,11 @@ def main():
     elif role == "District Education Officer":
         render_district_dashboard(user_profile)
 
-    elif role in ["State Education Department Official", "System Administrator"]:
+    elif role == "State Education Department Official":
         render_state_dashboard(user_profile)
+
+    elif role == "System Administrator":
+        render_admin_dashboard(user_profile)
 
     else:
         st.error(f"No dashboard configured for role: **{role}**")

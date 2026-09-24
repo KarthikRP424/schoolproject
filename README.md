@@ -121,26 +121,28 @@ schoolproject/
 │   └── permissions.py              # RBAC scope filter SQL builders
 │
 ├── services/
-│   ├── issue_service.py            # CRUD, duplicate detection, SLA
+│   ├── issue_service.py            # CRUD, duplicate detection, workflow graph
 │   ├── verification_service.py     # Confidence scoring, conflict detection
 │   ├── priority_engine.py          # Health, Priority, Decline Risk scores
 │   ├── notification_service.py     # In-app alert delivery
-│   ├── inspection_service.py       # Inspection log management
+│   ├── inspection_service.py       # Inspection logs & Student 3/5 Consensus
+│   ├── sla_service.py              # SLA tracking & auto-escalation engine
 │   └── audit_service.py            # Immutable audit trail
 │
 ├── components/
 │   ├── charts.py                   # Enrollment, attendance, score trends
-│   ├── maps.py                     # Priority-coloured coordinate maps
+│   ├── maps.py                     # Priority RGBA coloured coordinate maps
 │   └── timelines.py                # Issue lifecycle & audit visualisers
 │
 ├── dashboards/
 │   ├── school.py                   # Headmaster / Student Rep / Volunteer view
 │   ├── district.py                 # District Education Officer view
 │   ├── taluk.py                    # Taluk Education Officer view
-│   └── state.py                    # State-level analytics command centre
+│   ├── state.py                    # State-level analytics command centre
+│   └── admin.py                    # System Administrator panel & safe DB reset
 │
 ├── tests/
-│   └── test_flow.py                # 8 automated tests (DB, auth, logic)
+│   └── test_flow.py                # 12 automated tests (DB, auth, SLA, consensus)
 │
 └── data/
     └── sample_reports.csv          # Legacy sample data
@@ -214,7 +216,7 @@ schoolproject/
 python -m unittest tests/test_flow.py -v
 ```
 
-Expected output: **8/8 tests pass** covering database initialization, PBKDF2 hashing, authentication, password reset, priority scoring, decline risk, and verification conflict logic.
+Expected output: **12/12 tests pass** covering database initialization, PBKDF2 hashing, authentication, password reset, priority scoring, decline risk, SLA escalation, 3/5 student consensus, duplicate merging, and workflow transition graphs.
 
 ---
 

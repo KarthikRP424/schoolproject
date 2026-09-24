@@ -29,23 +29,40 @@ def calculate_school_priority(school_id: int) -> dict:
     if not school:
         return {"score": 0.0, "level": "LOW", "breakdown": {}}
 
-    # 2. Fetch Unresolved Issues Count
+    # 2. Fetch Unresolved Issues Count (canonical statuses)
     issues_row = execute_query(
-        "SELECT COUNT(*) as count FROM issues WHERE school_id = ? AND status != 'Closed';",
+        "SELECT COUNT(*) as count FROM issues WHERE school_id = ? AND status NOT IN ('CLOSED','MERGED','Closed');",
         (school_id,),
         fetch="one"
     )
     unresolved_count = issues_row["count"] if issues_row else 0
 
+    # 3. Fetch teacher absence metrics (Phase 2G: use sanctioned/present if available)
+    teacher_metrics = execute_query(
+        "SELECT sanctioned_teachers, present_teachers, absent_teachers FROM schools WHERE id = ?;",
+        (school_id,), fetch="one"
+    )
+    has_precise_teacher_data = (
+        teacher_metrics and
+        teacher_metrics.get("sanctioned_teachers") is not None and
+        teacher_metrics["sanctioned_teachers"] > 0
+    )
+
     # ─────────────────────────────────────────────────────────────────────────
     # CALCULATE COMPONENT SCORES
     # ─────────────────────────────────────────────────────────────────────────
     
-    # A. Teacher Shortage (25%)
-    req_t = max(school["required_teachers"], 1)
-    avail_t = school["available_teachers"]
-    shortage_ratio = max(0.0, (req_t - avail_t) / req_t)
-    teacher_shortage_score = shortage_ratio * 100.0  # Normalized to 100
+    # A. Teacher Shortage (25%) — prefer sanctioned/present data when available
+    if has_precise_teacher_data:
+        sanctioned = teacher_metrics["sanctioned_teachers"]
+        present    = teacher_metrics["present_teachers"]
+        absent     = teacher_metrics["absent_teachers"] or (sanctioned - present)
+        shortage_ratio = max(0.0, absent / sanctioned)
+    else:
+        req_t = max(school["required_teachers"], 1)
+        avail_t = school["available_teachers"]
+        shortage_ratio = max(0.0, (req_t - avail_t) / req_t)
+    teacher_shortage_score = shortage_ratio * 100.0
 
     # B. Infrastructure Condition (25%)
     # Evaluate classroom and building condition from JSON
@@ -263,7 +280,10 @@ def calculate_school_decline_risk(school_id: int) -> dict:
     teacher_factor = max(0.0, (req - avail) / req) * 20.0
 
     # 4. Open Complaints Factor (10%)
-    issues_row = execute_query("SELECT COUNT(*) as count FROM issues WHERE school_id = ? AND status != 'Closed';", (school_id,), fetch="one")
+    issues_row = execute_query(
+        "SELECT COUNT(*) as count FROM issues WHERE school_id = ? AND status NOT IN ('CLOSED','MERGED','Closed');",
+        (school_id,), fetch="one"
+    )
     unresolved_count = issues_row["count"] if issues_row else 0
     open_factor = min(unresolved_count * 2.0, 10.0)  # Maxes out at 5 open issues
 
@@ -307,20 +327,36 @@ def get_school_improvement_score(school_id: int) -> float:
 def update_all_school_scores():
     """
     Re-calculates priority, health, and risk parameters for all schools in the DB.
+    Phase 2G: Also saves a historical_scores snapshot on every recalculation
+    so trend charts always have up-to-date data.
     """
+    from datetime import datetime
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     schools = execute_query("SELECT id FROM schools;")
     for s in schools:
         sid = s["id"]
         priority = calculate_school_priority(sid)
-        health = calculate_school_health(sid)
-        risk = calculate_school_decline_risk(sid)
-        
+        health   = calculate_school_health(sid)
+        risk     = calculate_school_decline_risk(sid)
+
+        # Update live scores in schools table
         execute_query(
             """
-            UPDATE schools 
-            SET health_score = ?, priority_score = ?, decline_risk = ?, priority_level = ? 
+            UPDATE schools
+            SET health_score = ?, priority_score = ?, decline_risk = ?, priority_level = ?
             WHERE id = ?;
             """,
             (health["score"], priority["score"], risk["percentage"], priority["level"], sid),
+            fetch="rowcount"
+        )
+
+        # Snapshot into historical_scores (Phase 2G)
+        execute_query(
+            """
+            INSERT INTO historical_scores (school_id, timestamp, health_score, priority_score)
+            VALUES (?, ?, ?, ?);
+            """,
+            (sid, now, health["score"], priority["score"]),
             fetch="rowcount"
         )

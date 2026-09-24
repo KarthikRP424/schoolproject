@@ -51,17 +51,29 @@ def get_db_connection():
 def execute_query(query: str, params: tuple = (), fetch: str = "all"):
     """
     Helper function to run a SQL query within a transaction context.
+    Translates SQLite '?' placeholders to MySQL '%s' placeholders dynamically if needed.
     Returns: List of dicts for 'all', single dict/None for 'one', int for 'lastrowid' or 'rowcount'.
     """
+    if config.DB_TYPE == "mysql":
+        query = query.replace("?", "%s")
+
     with get_db_connection() as conn:
-        cursor = conn.cursor()
+        if config.DB_TYPE == "mysql":
+            cursor = conn.cursor(dictionary=True)
+        else:
+            cursor = conn.cursor()
+            
         cursor.execute(query, params)
         
         if fetch == "all":
             rows = cursor.fetchall()
+            if config.DB_TYPE == "mysql":
+                return list(rows) if rows else []
             return [dict(r) for r in rows] if rows else []
         elif fetch == "one":
             row = cursor.fetchone()
+            if config.DB_TYPE == "mysql":
+                return row
             return dict(row) if row else None
         elif fetch == "lastrowid":
             return cursor.lastrowid

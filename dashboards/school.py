@@ -11,6 +11,8 @@ from datetime import datetime
 from database.connection import execute_query
 from services.issue_service import create_issue, get_filtered_issues, update_issue_status
 from services.verification_service import submit_verification
+from services.inspection_service import submit_student_consensus, get_pending_student_verifications
+from services.sla_service import get_sla_status_for_issue
 from services.priority_engine import (
     calculate_school_health, calculate_school_priority, 
     calculate_school_decline_risk, get_school_improvement_score
@@ -170,9 +172,11 @@ def render_school_dashboard(user_profile: dict):
         st.subheader("🔍 Local Verification Loop")
         st.write("Confirm reports logged by others or give student-representative closure approvals.")
 
-        # Fetch open issues for this school
+        # Fetch open issues for this school using canonical status names
         open_issues = execute_query(
-            "SELECT * FROM issues WHERE school_id = ? AND status != 'Closed' ORDER BY submitted_time DESC;",
+            """SELECT * FROM issues WHERE school_id = ?
+               AND status NOT IN ('CLOSED','MERGED','Closed')
+               ORDER BY submitted_time DESC;""",
             (school_id,)
         )
 
@@ -186,11 +190,39 @@ def render_school_dashboard(user_profile: dict):
             )
             
             selected_issue = next(i for i in open_issues if i["id"] == issue_select)
+            
+            # SLA Status Badge
+            sla = get_sla_status_for_issue(selected_issue)
+            sla_icon = {"BREACHED": "🔴", "DUE_SOON": "🟡", "ON_TRACK": "🟢"}.get(sla["status"], "⚪")
+            st.markdown(f"**SLA Status:** {sla_icon} `{sla['label']}`")
+            
             st.markdown(f"💬 **Complaint Description:** \"{selected_issue['description']}\"")
-            st.markdown(f"📈 **Current Confidence Score:** `{selected_issue['verification_confidence']}%` | **Status:** `{selected_issue['verification_status']}`")
+            st.markdown(f"📈 **Confidence:** `{selected_issue['verification_confidence']}%` | **Verification Status:** `{selected_issue['verification_status']}`")
             
             # Show progress timeline
             draw_issue_status_timeline(selected_issue["status"])
+
+            # Student Consensus voting (only for STUDENT_VERIFICATION status)
+            if selected_issue["status"] == "STUDENT_VERIFICATION" and user_profile["role"] == "Student Representative":
+                st.markdown("### 🗳️ Student Consensus Vote")
+                st.info("3 of 5 student representatives must approve to CLOSE, or 3 rejections to REOPEN.")
+                col_a, col_r = st.columns(2)
+                with col_a:
+                    if st.button("✅ Approve — Issue Resolved", key=f"cons_app_{issue_select}"):
+                        result = submit_student_consensus(issue_select, user_profile["id"], approves=True)
+                        if result["action"] == "CLOSED":
+                            st.success(f"Issue CLOSED by consensus! ({result['approvals']}/5 approvals)")
+                        else:
+                            st.info(f"Vote recorded. Approvals: {result['approvals']}, Rejections: {result['rejections']}")
+                        st.rerun()
+                with col_r:
+                    if st.button("❌ Reject — Problem Not Fixed", key=f"cons_rej_{issue_select}"):
+                        result = submit_student_consensus(issue_select, user_profile["id"], approves=False)
+                        if result["action"] == "REOPENED":
+                            st.warning(f"Issue REOPENED! ({result['rejections']}/5 rejections)")
+                        else:
+                            st.info(f"Vote recorded. Approvals: {result['approvals']}, Rejections: {result['rejections']}")
+                        st.rerun()
 
             # ─────────────────────────────────────────────────────────────────
             # VERIFY ACTION

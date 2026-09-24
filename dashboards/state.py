@@ -9,6 +9,7 @@ import pandas as pd
 import json
 from database.connection import execute_query
 from services.priority_engine import update_all_school_scores
+from services.sla_service import check_and_escalate_sla
 from services.notification_service import get_unread_notifications, mark_notification_as_read
 from components.maps import draw_schools_map
 from components.charts import plot_district_comparison
@@ -20,8 +21,14 @@ def render_state_dashboard(user_profile: dict):
     st.title("🏛️ Karnataka State School Monitoring Command Center")
     st.write("Welcome, State Administrator. Real-time data compiled from school inspection nodes across districts.")
 
-    # Refresh scores on loading dashboard
+    # Refresh priority scores on dashboard load
     update_all_school_scores()
+    
+    # Run SLA escalation check on dashboard load (prototype behaviour — cron in production)
+    sla_result = check_and_escalate_sla()
+    if sla_result["escalated"]:
+        st.warning(f"⏰ **SLA Engine:** {sla_result['total_breached']} overdue issue(s) detected. "
+                   f"{len(sla_result['escalated'])} escalated to higher authority.")
 
     # Load all schools
     schools = execute_query("SELECT * FROM schools;")
@@ -98,12 +105,12 @@ def render_state_dashboard(user_profile: dict):
         if issue_cat_select == "All":
             active_coords = [
                 {"latitude": float(i["latitude"]), "longitude": float(i["longitude"]), "priority_level": i["priority_level"]}
-                for i in issues if i["latitude"] not in ["None", None] and i["status"] != "Closed"
+                for i in issues if i.get("latitude") not in ["None", None] and i.get("status") not in ["CLOSED", "MERGED", "Closed"]
             ]
         else:
             active_coords = [
                 {"latitude": float(i["latitude"]), "longitude": float(i["longitude"]), "priority_level": i["priority_level"]}
-                for i in issues if i["latitude"] not in ["None", None] and i["status"] != "Closed" and i["category"] == issue_cat_select
+                for i in issues if i.get("latitude") not in ["None", None] and i.get("status") not in ["CLOSED", "MERGED", "Closed"] and i.get("category") == issue_cat_select
             ]
             
         if active_coords:

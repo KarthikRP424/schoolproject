@@ -7,6 +7,12 @@ from services.issue_service import get_filtered_issues
 from services.priority_engine import calculate_school_priority, calculate_school_health, calculate_school_decline_risk
 from database.connection import execute_query
 
+from database.models import initialize_database
+from database.seed import seed_demo_data
+
+initialize_database()
+seed_demo_data()
+
 errors = []
 
 # ── 1. Login tests ────────────────────────────────────────────────────────────
