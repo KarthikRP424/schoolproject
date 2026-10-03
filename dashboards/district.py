@@ -6,6 +6,7 @@ Limits scope to the officer's district and supports status tracking, inspector a
 """
 import streamlit as st
 import pandas as pd
+import json
 from database.connection import execute_query
 from services.issue_service import get_filtered_issues, update_issue_status
 from services.inspection_service import create_inspection
@@ -116,8 +117,14 @@ def render_district_dashboard(user_profile: dict):
                     "category": "Category", "priority_level": "Priority", "status": "Status", "submitted_time": "Date Logged"
                 }), use_container_width=True, hide_index=True)
 
-                # Selected Detail View / Government Review & AI Verification
+                # Report selector — officer picks which complaint to review
                 st.markdown("---")
+                rpt_ids = filtered_df["report_id"].tolist()
+                selected_rpt_id = st.selectbox(
+                    "🔎 Select Report to Review",
+                    options=rpt_ids,
+                    key="district_review_select"
+                )
                 st.subheader(f"🏛️ Government Authority Review & AI Evidence Audit — {selected_rpt_id}")
                 selected_issue = next(i for i in issues if i["report_id"] == selected_rpt_id)
 
