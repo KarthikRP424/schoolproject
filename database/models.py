@@ -247,8 +247,13 @@ def initialize_database():
                 statement = statement.replace("TEXT", "LONGTEXT")
             cursor.execute(statement)
 
-        # Safe Column Migrations for issues table
+        # Safe Column Migrations for issues table.
+        # Each entry is (column_name, column_type_with_default).
+        # The ALTER TABLE is wrapped in try/except so it is fully idempotent:
+        # if the column already exists SQLite raises OperationalError which we
+        # silently ignore — existing data is NEVER touched.
         new_cols = [
+            # --- Hackathon SIH26095 evidence columns ---
             ("title", "TEXT"),
             ("uploaded_doc_name", "TEXT"),
             ("uploaded_video_name", "TEXT"),
@@ -260,10 +265,14 @@ def initialize_database():
             ("risk_level", "TEXT DEFAULT 'LOW'"),
             ("officer_decision", "TEXT"),
             ("officer_remarks", "TEXT"),
-            ("officer_decision_time", "TEXT")
+            ("officer_decision_time", "TEXT"),
+            # --- SLA / Escalation columns (used by services/sla_service.py) ---
+            # escalation_level: 0 = not yet escalated, 1 = escalated to Headmaster,
+            #   2 = Taluk Officer, 3 = District/State level (mirrors ESCALATION_CHAIN index)
+            ("escalation_level", "INTEGER DEFAULT 0"),
         ]
         for col_name, col_type in new_cols:
             try:
                 cursor.execute(f"ALTER TABLE issues ADD COLUMN {col_name} {col_type};")
             except Exception:
-                pass  # Column already exists
+                pass  # Column already exists — safe to ignore
