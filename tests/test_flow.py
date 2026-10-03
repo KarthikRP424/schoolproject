@@ -275,17 +275,74 @@ class TestSchoolMonitoringSystem(unittest.TestCase):
         
         school = execute_query("SELECT id FROM schools LIMIT 1;", fetch="one")
         school_id = school["id"]
-        
-        master = create_issue(school_id, 1, "Headmaster", "Broken toilet door in block A", False, False)
-        dup = create_issue(school_id, 2, "Student Representative", "Broken toilet door in block A", False, False)
-        
-        user_profile = {"id": 1, "role": "System Administrator", "district": "Shivamogga"}
+        users = execute_query("SELECT id FROM users LIMIT 2;")
+        u1_id = users[0]["id"]
+        u2_id = users[1]["id"] if len(users) > 1 else u1_id
+
+        master = create_issue(school_id, u1_id, "Headmaster", "Broken toilet door in block A", False, False)
+        dup = create_issue(school_id, u2_id, "Student Representative", "Broken toilet door in block A", False, False)
+
+        user_profile = {"id": u1_id, "role": "System Administrator", "district": "Shivamogga"}
         success = merge_duplicate_issues(dup["id"], master["id"], user_profile)
         self.assertTrue(success)
 
         dup_issue = execute_query("SELECT status, parent_issue_id FROM issues WHERE id = ?;", (dup["id"],), fetch="one")
         self.assertEqual(dup_issue["status"], "MERGED")
         self.assertEqual(dup_issue["parent_issue_id"], master["id"])
+
+    def test_ai_cross_verification_engine(self):
+        """
+        Verifies SIH26095 AI Multi-Source Cross-Verification Engine checks & safety rules.
+        """
+        from agent import run_ai_cross_verification
+
+        # Test 1: Consistent report
+        c_res = run_ai_cross_verification({
+            "school_name": "Government Primary School, Rampura",
+            "school_lat": 13.8415,
+            "school_lon": 75.7022,
+            "issue_description": "Clean drinking water pipe leaking",
+            "has_photo": True,
+            "photo_name": "leak.jpg",
+            "has_doc": True,
+            "doc_name": "water_log.pdf",
+            "gps_coords": "13.8415, 75.7022"
+        })
+        self.assertGreaterEqual(c_res["overall_consistency_score"], 80)
+        self.assertEqual(c_res["checks"]["location"]["status"], "MATCH")
+        self.assertIn("appears consistent", c_res["checks"]["text_image"]["reason"]) # Safety phrasing
+
+        # Test 2: Location mismatch (>2km)
+        m_res = run_ai_cross_verification({
+            "school_name": "Government Primary School, Rampura",
+            "school_lat": 13.8415,
+            "school_lon": 75.7022,
+            "issue_description": "Boundary wall cracked",
+            "has_photo": True,
+            "gps_coords": "14.0500, 75.9000" # 14.5km mismatch
+        })
+        self.assertEqual(m_res["checks"]["location"]["status"], "MISMATCH")
+        self.assertTrue(m_res["requires_human_review"])
+        self.assertIn("LOCATION_MISMATCH", m_res["contradictions"][0])
+
+    def test_officer_decision_recording(self):
+        """
+        Verifies Government Authority decision recording.
+        """
+        from services.issue_service import record_officer_decision
+
+        school = execute_query("SELECT id FROM schools LIMIT 1;", fetch="one")
+        user = execute_query("SELECT id FROM users LIMIT 1;", fetch="one")
+        iss = create_issue(school["id"], user["id"], "Headmaster", "Plumbing test issue", False, False)
+
+        # Record officer decision Accept
+        ok = record_officer_decision(iss["id"], user["id"], "Accept", "Sanctioned emergency plumber work order")
+        self.assertTrue(ok)
+
+        row = execute_query("SELECT status, officer_decision, officer_remarks FROM issues WHERE id = ?;", (iss["id"],), fetch="one")
+        self.assertEqual(row["status"], "VERIFIED")
+        self.assertEqual(row["officer_decision"], "Accept")
+        self.assertIn("Sanctioned", row["officer_remarks"])
 
 if __name__ == "__main__":
     unittest.main()

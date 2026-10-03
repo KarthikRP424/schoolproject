@@ -278,19 +278,46 @@ def seed_demo_data():
         hm_rampura = user_id_map["headmaster_rampura"]
         stu_rampura = user_id_map["student_rampura"]
         
+        from agent import run_ai_cross_verification
+
+        # Sample 1: Genuine / Consistent Report
+        cross_a = run_ai_cross_verification({
+            "report_id": "RPT-0001",
+            "school_id": rampura_id,
+            "school_name": "Government Higher Primary School, Rampura",
+            "district": "Shivamogga",
+            "taluk": "Bhadravathi",
+            "school_lat": 13.8415,
+            "school_lon": 75.7022,
+            "title": "Student Washroom Plumbing Blockage",
+            "issue_description": "The student boys toilet drainage is blocked and requires plumber repair.",
+            "has_photo": True,
+            "photo_name": "toilet_repair.jpg",
+            "has_doc": True,
+            "doc_name": "rampura_plumbing_workorder.pdf",
+            "has_gps": True,
+            "gps_coords": "13.8415, 75.7022"
+        })
+
         cursor.execute(
             """
             INSERT INTO issues (
-                report_id, school_id, reporter_id, reporter_role, category, description,
+                report_id, school_id, reporter_id, reporter_role, category, title, description,
                 submitted_time, latitude, longitude, status, verification_status,
-                verification_confidence, dangerous_school_status, assignment, resolution_deadline
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                verification_confidence, dangerous_school_status, assignment, resolution_deadline,
+                uploaded_image_name, uploaded_doc_name, ai_verification_json,
+                overall_consistency_score, evidence_confidence, risk_score, risk_level
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 "RPT-0001", rampura_id, hm_rampura, "Headmaster", "Sanitation",
+                "Student Washroom Plumbing Blockage",
                 "The student boys toilet drainage is blocked and requires plumber repair.",
                 "2026-08-01 10:00:00", "13.8415", "75.7022", "Closed", "Highly Verified",
-                95.0, 0, "Bhadravathi Block Engineer", "2026-08-08 10:00:00"
+                95.0, 0, "Bhadravathi Block Engineer", "2026-08-08 10:00:00",
+                "toilet_repair.jpg", "rampura_plumbing_workorder.pdf", json.dumps(cross_a),
+                float(cross_a["overall_consistency_score"]), float(cross_a["evidence_confidence"]),
+                float(cross_a["risk_score"]), cross_a["risk_level"]
             )
         )
         issue_a_id = cursor.lastrowid
@@ -309,26 +336,50 @@ def seed_demo_data():
             cursor.execute("INSERT INTO student_feedback (issue_id, rep_name, status_rating, feedback_text, timestamp) VALUES (?, ?, ?, ?, ?);",
                            (issue_a_id, uname, "Fully Solved", "Plumbing issue is fixed. Toilets are working now.", "2026-08-05 16:00:00"))
 
-        # Scenario B: Headmaster and students disagree -> conflict -> inspection recommended
-        # GHS Sagar
+        # Scenario B: Disagree / Mismatch Report
         sagar_id = school_id_map["Government High School, Sagar"]
         hm_sagar = user_id_map["headmaster_sagar"]
         stu_sagar = user_id_map["student_sagar"]
         vol_sagar = user_id_map["volunteer_sagar"]
 
+        cross_b = run_ai_cross_verification({
+            "report_id": "RPT-0002",
+            "school_id": sagar_id,
+            "school_name": "Government High School, Sagar",
+            "district": "Shivamogga",
+            "taluk": "Sagar",
+            "school_lat": 14.1672,
+            "school_lon": 75.0234,
+            "title": "Purifier Failure & Muddy Drinking Water",
+            "issue_description": "The drinking water purification system has stopped working. Dirty mud water is coming from the pipe.",
+            "has_photo": True,
+            "photo_name": "muddy_water.jpg",
+            "has_doc": True,
+            "doc_name": "invoice_other_school_b.pdf",
+            "doc_text": "Maintenance invoice for School B Bhadravathi",
+            "has_gps": True,
+            "gps_coords": "14.1672, 75.0234"
+        })
+
         cursor.execute(
             """
             INSERT INTO issues (
-                report_id, school_id, reporter_id, reporter_role, category, description,
+                report_id, school_id, reporter_id, reporter_role, category, title, description,
                 submitted_time, latitude, longitude, status, verification_status,
-                verification_confidence, dangerous_school_status, assignment, resolution_deadline
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                verification_confidence, dangerous_school_status, assignment, resolution_deadline,
+                uploaded_image_name, uploaded_doc_name, ai_verification_json,
+                overall_consistency_score, evidence_confidence, risk_score, risk_level
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 "RPT-0002", sagar_id, stu_sagar, "Student Representative", "Drinking Water",
+                "Purifier Failure & Muddy Drinking Water",
                 "The drinking water purification system has stopped working. Dirty mud water is coming from the pipe.",
                 "2026-08-18 09:30:00", "14.1672", "75.0234", "Inspection Required", "Review Required",
-                50.0, 0, "Sagar Taluk Health Officer", "2026-08-25 09:30:00"
+                50.0, 0, "Sagar Taluk Health Officer", "2026-08-25 09:30:00",
+                "muddy_water.jpg", "invoice_other_school_b.pdf", json.dumps(cross_b),
+                float(cross_b["overall_consistency_score"]), float(cross_b["evidence_confidence"]),
+                float(cross_b["risk_score"]), cross_b["risk_level"]
             )
         )
         issue_b_id = cursor.lastrowid
@@ -348,24 +399,47 @@ def seed_demo_data():
             (issue_b_id,)
         )
 
-        # Scenario C: Unsafe building -> emergency -> officer alert -> inspection required
-        # GHS Mudigere
+        # Scenario C: Unsafe building -> emergency
         mudigere_id = school_id_map["Government High School, Mudigere"]
         stu_mudigere = user_id_map["student_mudigere"]
+
+        cross_c = run_ai_cross_verification({
+            "report_id": "RPT-0003",
+            "school_id": mudigere_id,
+            "school_name": "Government High School, Mudigere",
+            "district": "Chikkamagaluru",
+            "taluk": "Mudigere",
+            "school_lat": 13.1368,
+            "school_lon": 75.6372,
+            "title": "Ceiling Concrete Slab Crack Hazard",
+            "issue_description": "Cracks have opened in the ceiling of the Class 9 classroom. Small pieces of concrete are falling during study hours. Unsafe building.",
+            "has_photo": True,
+            "photo_name": "ceiling_crack.jpg",
+            "has_doc": True,
+            "doc_name": "draft_engineer_report_no_stamp.pdf",
+            "has_gps": True,
+            "gps_coords": "13.1368, 75.6372"
+        })
 
         cursor.execute(
             """
             INSERT INTO issues (
-                report_id, school_id, reporter_id, reporter_role, category, description,
+                report_id, school_id, reporter_id, reporter_role, category, title, description,
                 submitted_time, latitude, longitude, status, verification_status,
-                verification_confidence, dangerous_school_status, assignment, resolution_deadline
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                verification_confidence, dangerous_school_status, assignment, resolution_deadline,
+                uploaded_image_name, uploaded_doc_name, ai_verification_json,
+                overall_consistency_score, evidence_confidence, risk_score, risk_level
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 "RPT-0003", mudigere_id, stu_mudigere, "Student Representative", "Infrastructure",
+                "Ceiling Concrete Slab Crack Hazard",
                 "Cracks have opened in the ceiling of the Class 9 classroom. Small pieces of concrete are falling during study hours. Unsafe building.",
                 "2026-08-19 15:45:00", "13.1368", "75.6372", "Pending", "Review Required",
-                30.0, 1, None, "2026-08-21 15:45:00" # Emergency 48h SLA
+                30.0, 1, None, "2026-08-21 15:45:00",
+                "ceiling_crack.jpg", "draft_engineer_report_no_stamp.pdf", json.dumps(cross_c),
+                float(cross_c["overall_consistency_score"]), float(cross_c["evidence_confidence"]),
+                float(cross_c["risk_score"]), cross_c["risk_level"]
             )
         )
         issue_c_id = cursor.lastrowid
@@ -379,39 +453,84 @@ def seed_demo_data():
             (issue_c_id,)
         )
 
-        # Scenario F: Multiple users report the same issue -> duplicate detection
-        # Create duplicate issues for Mudigere infrastructure crack
+        # Scenario F: Duplicate report
+        cross_d = run_ai_cross_verification({
+            "report_id": "RPT-0004",
+            "school_id": mudigere_id,
+            "school_name": "Government High School, Mudigere",
+            "district": "Chikkamagaluru",
+            "taluk": "Mudigere",
+            "school_lat": 13.1368,
+            "school_lon": 75.6372,
+            "title": "Classroom Plaster Ceiling Fracture",
+            "issue_description": "Class 9 room roof structural cracks on ceiling plaster, requires civil engineer inspection.",
+            "has_photo": True,
+            "photo_name": "ceiling_fracture.jpg",
+            "has_doc": False,
+            "has_gps": True,
+            "gps_coords": "13.1368, 75.6372"
+        })
+
         cursor.execute(
             """
             INSERT INTO issues (
-                report_id, school_id, reporter_id, reporter_role, category, description,
+                report_id, school_id, reporter_id, reporter_role, category, title, description,
                 submitted_time, latitude, longitude, status, verification_status,
-                verification_confidence, dangerous_school_status, assignment, resolution_deadline
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                verification_confidence, dangerous_school_status, assignment, resolution_deadline,
+                uploaded_image_name, ai_verification_json,
+                overall_consistency_score, evidence_confidence, risk_score, risk_level
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 "RPT-0004", mudigere_id, user_id_map["headmaster_mudigere"], "Headmaster", "Infrastructure",
+                "Classroom Plaster Ceiling Fracture",
                 "Class 9 room roof structural cracks on ceiling plaster, requires civil engineer inspection.",
-                "2026-08-19 17:00:00", "13.1368", "75.6372", "Pending", "Review Required",
-                30.0, 1, None, "2026-08-21 17:00:00"
+                "2026-08-19 17:00:00", "13.1368", "75.6372", "Under Review", "Review Required",
+                30.0, 1, None, "2026-08-21 17:00:00",
+                "ceiling_fracture.jpg", json.dumps(cross_d),
+                float(cross_d["overall_consistency_score"]), float(cross_d["evidence_confidence"]),
+                float(cross_d["risk_score"]), cross_d["risk_level"]
             )
         )
 
-        # Scenario G: Issue remains unresolved -> SLA expires -> escalation
-        # GHPS Rampura
+        # Scenario G: Unresolved SLA escalation
+        cross_e = run_ai_cross_verification({
+            "report_id": "RPT-0005",
+            "school_id": rampura_id,
+            "school_name": "Government Higher Primary School, Rampura",
+            "district": "Shivamogga",
+            "taluk": "Bhadravathi",
+            "school_lat": 13.8415,
+            "school_lon": 75.7022,
+            "title": "Main Electrical Line Cut Outage",
+            "issue_description": "Main power line is cut due to tree fall. No fans or lights working in school for over 2 weeks.",
+            "has_photo": True,
+            "photo_name": "power_line_tree.jpg",
+            "has_doc": True,
+            "doc_name": "eb_complaint_copy.pdf",
+            "has_gps": True,
+            "gps_coords": "13.8415, 75.7022"
+        })
+
         cursor.execute(
             """
             INSERT INTO issues (
-                report_id, school_id, reporter_id, reporter_role, category, description,
+                report_id, school_id, reporter_id, reporter_role, category, title, description,
                 submitted_time, latitude, longitude, status, verification_status,
-                verification_confidence, dangerous_school_status, assignment, resolution_deadline, is_escalated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                verification_confidence, dangerous_school_status, assignment, resolution_deadline, is_escalated,
+                uploaded_image_name, uploaded_doc_name, ai_verification_json,
+                overall_consistency_score, evidence_confidence, risk_score, risk_level
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 "RPT-0005", rampura_id, user_id_map["volunteer_rampura"], "Village Volunteer", "Electricity",
+                "Main Electrical Line Cut Outage",
                 "Main power line is cut due to tree fall. No fans or lights working in school for over 2 weeks.",
                 "2026-08-01 08:00:00", "13.8415", "75.7022", "Pending", "Verified",
-                60.0, 0, "Bhadravathi Power Section", "2026-08-08 08:00:00", 1
+                60.0, 0, "Bhadravathi Power Section", "2026-08-08 08:00:00", 1,
+                "power_line_tree.jpg", "eb_complaint_copy.pdf", json.dumps(cross_e),
+                float(cross_e["overall_consistency_score"]), float(cross_e["evidence_confidence"]),
+                float(cross_e["risk_score"]), cross_e["risk_level"]
             )
         )
         issue_g_id = cursor.lastrowid
@@ -425,25 +544,91 @@ def seed_demo_data():
             (issue_g_id,)
         )
 
-        # Scenario H: Student representative rejects claimed resolution
-        # Belur Primary
+        # Scenario H: Student rejection
         belur_id = school_id_map["Government Middle School, Belur"]
+        cross_h = run_ai_cross_verification({
+            "report_id": "RPT-0006",
+            "school_id": belur_id,
+            "school_name": "Government Middle School, Belur",
+            "district": "Hassan",
+            "taluk": "Belur",
+            "school_lat": 13.1624,
+            "school_lon": 75.8598,
+            "title": "Girls Section Plumbing Overflow",
+            "issue_description": "Plumbing blockage and overflowing toilets in girls section.",
+            "has_photo": True,
+            "photo_name": "belur_overflow.jpg",
+            "has_doc": True,
+            "doc_name": "plumber_bill_belur.pdf",
+            "has_gps": True,
+            "gps_coords": "13.1624, 75.8598"
+        })
+
         cursor.execute(
             """
             INSERT INTO issues (
-                report_id, school_id, reporter_id, reporter_role, category, description,
+                report_id, school_id, reporter_id, reporter_role, category, title, description,
                 submitted_time, latitude, longitude, status, verification_status,
-                verification_confidence, dangerous_school_status, assignment, resolution_deadline
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                verification_confidence, dangerous_school_status, assignment, resolution_deadline,
+                uploaded_image_name, uploaded_doc_name, ai_verification_json,
+                overall_consistency_score, evidence_confidence, risk_score, risk_level
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 "RPT-0006", belur_id, user_id_map["officer_state"], "Education Officer", "Sanitation",
+                "Girls Section Plumbing Overflow",
                 "Plumbing blockage and overflowing toilets in girls section.",
                 "2026-08-10 11:00:00", "13.1624", "75.8598", "Action Completed", "Verified",
-                70.0, 0, "Belur Block Plumber", "2026-08-17 11:00:00"
+                70.0, 0, "Belur Block Plumber", "2026-08-17 11:00:00",
+                "belur_overflow.jpg", "plumber_bill_belur.pdf", json.dumps(cross_h),
+                float(cross_h["overall_consistency_score"]), float(cross_h["evidence_confidence"]),
+                float(cross_h["risk_score"]), cross_h["risk_level"]
             )
         )
         issue_h_id = cursor.lastrowid
+
+        # Sample 5: High-Risk Location Mismatch (RPT-0007)
+        cross_mismatch = run_ai_cross_verification({
+            "report_id": "RPT-0007",
+            "school_id": rampura_id,
+            "school_name": "Government Higher Primary School, Rampura",
+            "district": "Shivamogga",
+            "taluk": "Bhadravathi",
+            "school_lat": 13.8415,
+            "school_lon": 75.7022,
+            "title": "Outer Boundary Wall Collapse Threat",
+            "issue_description": "School outer boundary wall concrete cracking near primary playground area.",
+            "has_photo": True,
+            "photo_name": "wall_crack_distant.jpg",
+            "has_doc": True,
+            "doc_name": "civil_inspection_report.pdf",
+            "has_gps": True,
+            "gps_coords": "14.0500, 75.9000", # 14.5 km away!
+            "latitude": "14.0500",
+            "longitude": "75.9000"
+        })
+
+        cursor.execute(
+            """
+            INSERT INTO issues (
+                report_id, school_id, reporter_id, reporter_role, category, title, description,
+                submitted_time, latitude, longitude, status, verification_status,
+                verification_confidence, dangerous_school_status, assignment, resolution_deadline,
+                uploaded_image_name, uploaded_doc_name, ai_verification_json,
+                overall_consistency_score, evidence_confidence, risk_score, risk_level
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                "RPT-0007", rampura_id, hm_rampura, "Headmaster", "Infrastructure",
+                "Outer Boundary Wall Collapse Threat",
+                "School outer boundary wall concrete cracking near primary playground area.",
+                "2026-08-20 09:15:00", "14.0500", "75.9000", "Under Review", "Review Required",
+                42.0, 1, "Bhadravathi PWD Engineer", "2026-08-27 09:15:00",
+                "wall_crack_distant.jpg", "civil_inspection_report.pdf", json.dumps(cross_mismatch),
+                float(cross_mismatch["overall_consistency_score"]), float(cross_mismatch["evidence_confidence"]),
+                float(cross_mismatch["risk_score"]), cross_mismatch["risk_level"]
+            )
+        )
 
         # Student feedback rejects the fix
         cursor.execute("INSERT INTO student_feedback (issue_id, rep_name, status_rating, feedback_text, timestamp) VALUES (?, ?, ?, ?, ?);",

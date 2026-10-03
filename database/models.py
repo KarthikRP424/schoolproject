@@ -65,6 +65,7 @@ def initialize_database():
             reporter_id INTEGER NOT NULL,
             reporter_role TEXT NOT NULL,
             category TEXT NOT NULL,
+            title TEXT NULL,
             description TEXT NOT NULL,
             submitted_time TEXT NOT NULL,
             latitude TEXT,
@@ -76,6 +77,17 @@ def initialize_database():
             photo_evidence_available INTEGER DEFAULT 0,  -- 1 if a photo was submitted
             gps_location_available INTEGER DEFAULT 0,    -- 1 if GPS coordinates were provided
             uploaded_image_name TEXT,
+            uploaded_doc_name TEXT NULL,
+            uploaded_video_name TEXT NULL,
+            additional_remarks TEXT NULL,
+            ai_verification_json TEXT NULL,
+            overall_consistency_score REAL DEFAULT 0.0,
+            evidence_confidence REAL DEFAULT 0.0,
+            risk_score REAL DEFAULT 0.0,
+            risk_level TEXT DEFAULT 'LOW',
+            officer_decision TEXT NULL,
+            officer_remarks TEXT NULL,
+            officer_decision_time TEXT NULL,
             assignment TEXT NULL,
             resolution_deadline TEXT NOT NULL,
             is_escalated INTEGER DEFAULT 0,
@@ -234,3 +246,24 @@ def initialize_database():
                 statement = statement.replace("REAL", "DOUBLE")
                 statement = statement.replace("TEXT", "LONGTEXT")
             cursor.execute(statement)
+
+        # Safe Column Migrations for issues table
+        new_cols = [
+            ("title", "TEXT"),
+            ("uploaded_doc_name", "TEXT"),
+            ("uploaded_video_name", "TEXT"),
+            ("additional_remarks", "TEXT"),
+            ("ai_verification_json", "TEXT"),
+            ("overall_consistency_score", "REAL DEFAULT 0.0"),
+            ("evidence_confidence", "REAL DEFAULT 0.0"),
+            ("risk_score", "REAL DEFAULT 0.0"),
+            ("risk_level", "TEXT DEFAULT 'LOW'"),
+            ("officer_decision", "TEXT"),
+            ("officer_remarks", "TEXT"),
+            ("officer_decision_time", "TEXT")
+        ]
+        for col_name, col_type in new_cols:
+            try:
+                cursor.execute(f"ALTER TABLE issues ADD COLUMN {col_name} {col_type};")
+            except Exception:
+                pass  # Column already exists

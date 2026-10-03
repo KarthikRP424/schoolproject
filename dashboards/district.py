@@ -116,40 +116,151 @@ def render_district_dashboard(user_profile: dict):
                     "category": "Category", "priority_level": "Priority", "status": "Status", "submitted_time": "Date Logged"
                 }), use_container_width=True, hide_index=True)
 
-                # Selected Detail View / Status Updates
-                st.subheader("⚙️ Update Issue Assignment & Status Log")
-                selected_rpt_id = st.selectbox("Select Report ID:", options=filtered_df["report_id"].tolist())
-                
-                # Fetch target issue
+                # Selected Detail View / Government Review & AI Verification
+                st.markdown("---")
+                st.subheader(f"🏛️ Government Authority Review & AI Evidence Audit — {selected_rpt_id}")
                 selected_issue = next(i for i in issues if i["report_id"] == selected_rpt_id)
+
+                # Fetch AI verification JSON
+                ai_json = selected_issue.get("ai_verification_json")
+                if ai_json:
+                    try:
+                        cross_ver = json.loads(ai_json)
+                    except Exception:
+                        cross_ver = None
+                else:
+                    cross_ver = None
+
+                # ── 1. REPORT SUMMARY ─────────────────────────────────────────
+                r_col1, r_col2, r_col3 = st.columns(3)
+                with r_col1:
+                    st.markdown(f"**Institution:** {selected_issue.get('school_name')}")
+                    st.markdown(f"**Category:** `{selected_issue.get('category')}`")
+                    st.markdown(f"**Title:** {selected_issue.get('title') or selected_issue.get('category')}")
+                with r_col2:
+                    st.markdown(f"**Reporter:** {selected_issue.get('reporter_role')} (ID: `{selected_issue.get('reporter_id')}`)")
+                    st.markdown(f"**Date Logged:** `{selected_issue.get('submitted_time')}`")
+                    st.markdown(f"**Current Status:** `{selected_issue.get('status')}`")
+                with r_col3:
+                    st.markdown(f"**Location:** GPS (`{selected_issue.get('latitude')}, {selected_issue.get('longitude')}`)")
+                    st.markdown(f"**SLA Deadline:** `{selected_issue.get('resolution_deadline')}`")
+                    if selected_issue.get("officer_decision"):
+                        st.success(f"**Officer Decision:** {selected_issue['officer_decision']}")
+
                 st.markdown(f"💬 **Complaint Description:** \"{selected_issue['description']}\"")
-                st.markdown(f"⏳ **SLA Deadline:** `{selected_issue['resolution_deadline']}`")
-                
-                # Display progress status
+                if selected_issue.get("additional_remarks"):
+                    st.caption(f"Remarks: {selected_issue['additional_remarks']}")
+
+                # ── 2. EVIDENCE PANEL ─────────────────────────────────────────
+                with st.expander("📁 Uploaded Evidence Files (Photo / Document / Video / GPS)", expanded=True):
+                    e_col1, e_col2, e_col3 = st.columns(3)
+                    with e_col1:
+                        img_name = selected_issue.get("uploaded_image_name")
+                        if img_name:
+                            st.markdown(f"📷 **Image Evidence:** `{img_name}`")
+                            st.caption("Visual evidence uploaded by reporter.")
+                        else:
+                            st.info("No photo evidence attached.")
+                    with e_col2:
+                        doc_name = selected_issue.get("uploaded_doc_name")
+                        if doc_name:
+                            st.markdown(f"📄 **Supporting Document:** `{doc_name}`")
+                            st.caption("Maintenance invoice / engineering report attached.")
+                        else:
+                            st.info("No supporting document attached.")
+                    with e_col3:
+                        vid_name = selected_issue.get("uploaded_video_name")
+                        if vid_name:
+                            st.markdown(f"🎥 **Video Evidence:** `{vid_name}`")
+                        else:
+                            st.caption("No video evidence attached.")
+
+                # ── 3. AI CROSS-VERIFICATION ENGINE BREAKDOWN ─────────────────
+                if cross_ver:
+                    st.markdown("#### 🤖 AI Multi-Source Cross-Verification Engine Audit")
+
+                    m1, m2, m3, m4 = st.columns(4)
+                    with m1:
+                        c_score = cross_ver.get("overall_consistency_score", 0)
+                        st.metric("Overall Consistency", f"{c_score}%")
+                    with m2:
+                        st.metric("Evidence Confidence", f"{cross_ver.get('evidence_confidence', 0)}%")
+                    with m3:
+                        st.metric("Risk Score", f"{cross_ver.get('risk_score', 0)}/100")
+                    with m4:
+                        r_lvl = cross_ver.get("risk_level", "LOW")
+                        r_icon = {"CRITICAL": "🔴", "HIGH": "🟧", "MEDIUM": "🨨", "LOW": "🟩"}.get(r_lvl, "⚪")
+                        st.metric("Risk Level", f"{r_icon} {r_lvl}")
+
+                    st.progress(c_score / 100.0)
+
+                    # 5 Checks Breakdown
+                    chk = cross_ver.get("checks", {})
+                    c_col1, c_col2 = st.columns(2)
+                    with c_col1:
+                        td = chk.get("text_document", {})
+                        st.markdown(f"**Check 1: Text ↔ Document:** `{td.get('status')}` (`{td.get('score')}%`)")
+                        st.caption(f"{td.get('reason')}")
+
+                        ti = chk.get("text_image", {})
+                        st.markdown(f"**Check 2: Text ↔ Image:** `{ti.get('status')}` (`{ti.get('score')}%`)")
+                        st.caption(f"{ti.get('reason')}")
+
+                        ds = chk.get("document", {})
+                        st.markdown(f"**Check 3: Document Audit:** `{ds.get('status')}` (`{ds.get('score')}%`)")
+                        st.caption(f"{ds.get('reason')}")
+
+                    with c_col2:
+                        lc = chk.get("location", {})
+                        st.markdown(f"**Check 4: Location Consistency:** `{lc.get('status')}` (`{lc.get('score')}%`)")
+                        st.caption(f"{lc.get('reason')}")
+
+                        hc = chk.get("historical", {})
+                        st.markdown(f"**Check 5: Historical Check:** Recurring: `{hc.get('recurring_issue')}` | Duplicate: `{hc.get('duplicate')}`")
+                        st.caption(f"{hc.get('reason')}")
+
+                    if cross_ver.get("contradictions"):
+                        st.warning(f"🚨 **Flags & Contradictions:** {', '.join(cross_ver['contradictions'])}")
+                    st.success(f"🎯 **AI Recommended Action:** {cross_ver.get('recommended_action')}")
+
+                # ── 4. GOVERNMENT OFFICER DECISION PANEL ──────────────────────
+                st.markdown("---")
+                st.markdown("### 🏛️ Government Authority Formal Decision Panel")
+                st.write("Review the report and AI evidence cross-verification above, then record your official administrative decision.")
+
+                with st.form(f"officer_decision_form_{selected_issue['id']}"):
+                    d_col1, d_col2 = st.columns([0.4, 0.6])
+                    with d_col1:
+                        decision_choice = st.radio(
+                            "Select Government Decision *",
+                            ["Accept", "Assign Inspection", "Request Clarification", "Escalate", "Reject", "Mark Resolved"]
+                        )
+                    with d_col2:
+                        decision_remarks = st.text_area(
+                            "Officer Remarks / Action Instructions *",
+                            placeholder="Enter official remarks, sanction work orders, or specify required clarifications..."
+                        )
+
+                    submit_decision = st.form_submit_button("✍️ Record Government Decision & Update Status", type="primary", use_container_width=True)
+
+                if submit_decision:
+                    if not decision_remarks.strip():
+                        st.error("Please enter officer remarks explaining your administrative decision.")
+                    else:
+                        from services.issue_service import record_officer_decision
+                        ok = record_officer_decision(
+                            issue_id=selected_issue["id"],
+                            officer_id=user_profile["id"],
+                            decision=decision_choice,
+                            remarks=decision_remarks.strip()
+                        )
+                        if ok:
+                            st.success(f"✅ Decision '{decision_choice}' recorded successfully with official audit log!")
+                            st.rerun()
+
+                # Display chronological status & audit logs
+                st.markdown("#### 📜 Timeline & Audit History")
                 draw_issue_status_timeline(selected_issue["status"])
-
-                uc1, uc2 = st.columns(2)
-                with uc1:
-                    # Update status
-                    new_status = st.selectbox(
-                        "Transition Status Stage:",
-                        options=["Pending", "Verified", "Under Review", "Inspection Required", "Action Started", "Action Completed", "Closed"],
-                        index=["Pending", "Verified", "Under Review", "Inspection Required", "Action Started", "Action Completed", "Closed"].index(selected_issue["status"])
-                    )
-                    if new_status != selected_issue["status"]:
-                        update_issue_status(selected_issue["id"], new_status, user_profile)
-                        st.success("Status stage updated!")
-                        st.rerun()
-                with uc2:
-                    # Update contractor assignment
-                    current_assign = selected_issue.get("assignment", "")
-                    new_assign = st.text_input("Assign Officer/Contractor Department:", value=current_assign if current_assign else "")
-                    if st.button("Save Assignment"):
-                        execute_query("UPDATE issues SET assignment = ? WHERE id = ?;", (new_assign, selected_issue["id"]), fetch="rowcount")
-                        st.success("Department assignment saved!")
-                        st.rerun()
-
-                # Display chronological logs
                 logs = get_audit_trail("issue", selected_rpt_id)
                 draw_audit_trail_timeline(logs)
 

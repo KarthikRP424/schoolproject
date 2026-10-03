@@ -23,83 +23,107 @@ def get_deadline_for_priority(priority_level: str) -> str:
 
 def create_issue(school_id: int, reporter_id: int, reporter_role: str,
                  description: str, has_photo: bool, has_gps: bool,
-                 gps_coords: str = "", photo_name: str = "") -> dict:
+                 gps_coords: str = "", photo_name: str = "",
+                 title: str = "", doc_name: str = "", video_name: str = "",
+                 additional_remarks: str = "") -> dict:
     """
-    Creates a new issue in the system, running the AI agent analysis,
-    calculating SLA deadlines, and checking for duplicates.
+    Creates a new issue in the system, running the AI agent multi-source cross-verification analysis,
+    calculating SLA deadlines, checking for duplicates, and saving structured evidence.
     """
-    # 1. Fetch School Details (Geographical context)
-    school = execute_query("SELECT name, district, taluk, village FROM schools WHERE id = ?;", (school_id,), fetch="one")
+    # 1. Fetch School Details (Geographical & institutional context)
+    school = execute_query("SELECT name, district, taluk, village, latitude, longitude FROM schools WHERE id = ?;", (school_id,), fetch="one")
     if not school:
         raise ValueError("School ID not found.")
 
-    # 2. Package data for the rule-based AI agent
-    report_data = {
-        "school_name": school["name"],
-        "district": school["district"],
-        "taluk": school["taluk"],
-        "reporter_role": reporter_role,
-        "issue_description": description,
-        "has_photo": has_photo,
-        "has_gps": has_gps
-    }
-    analysis = analyze_school_report(report_data)
-
-    # 3. Parse coordinates
+    # 2. Parse coordinates
     lat, lon = "None", "None"
-    if gps_coords and "," in gps_coords:
+    if gps_coords and "," in str(gps_coords):
         try:
-            parts = gps_coords.split(",")
+            parts = str(gps_coords).split(",")
             lat, lon = parts[0].strip(), parts[1].strip()
         except Exception:
             pass
 
-    # 4. Generate unique report_id and time variables
+    # 3. Generate unique report_id and time variables
     submitted_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Calculate incremental RPT identifier
     count_row = execute_query("SELECT COUNT(*) as count FROM issues;", fetch="one")
     count = count_row["count"] if count_row else 0
     report_id = f"RPT-{str(count + 1).zfill(4)}"
-    
-    # Calculate resolution SLA timestamp
+
+    # 4. Package data for AI Multi-Source Cross-Verification Engine
+    report_data = {
+        "report_id": report_id,
+        "school_id": school_id,
+        "school_name": school["name"],
+        "district": school["district"],
+        "taluk": school["taluk"],
+        "school_lat": school.get("latitude"),
+        "school_lon": school.get("longitude"),
+        "reporter_role": reporter_role,
+        "title": title or description[:40],
+        "issue_description": description,
+        "has_photo": has_photo or bool(photo_name),
+        "photo_name": photo_name,
+        "has_doc": bool(doc_name),
+        "doc_name": doc_name,
+        "has_gps": has_gps or bool(gps_coords),
+        "gps_coords": gps_coords,
+        "latitude": lat,
+        "longitude": lon,
+        "additional_remarks": additional_remarks
+    }
+    analysis = analyze_school_report(report_data)
+    cross = analysis["cross_verification"]
+
+    # 5. Calculate resolution SLA timestamp & dangerous status
     priority_level = analysis["priority_level"]
     resolution_deadline = get_deadline_for_priority(priority_level)
-    dangerous_status = 1 if priority_level == "Urgent" else 0
+    dangerous_status = 1 if (priority_level in ["Urgent", "EMERGENCY"] or cross["risk_level"] == "CRITICAL") else 0
 
-    # 5. Check for duplicate complaints
+    # 6. Check for duplicate complaints
     is_duplicate, parent_id = check_for_duplicate(school_id, analysis["category"], description)
     status = "Pending"
-    if is_duplicate:
-        status = "Under Review" # Automatically flags for review
+    if is_duplicate or cross.get("requires_human_review"):
+        status = "Under Review"
 
-    # 6. Insert issue record
+    # 7. Insert issue record with full AI Cross-Verification metrics & JSON
     query = """
         INSERT INTO issues (
-            report_id, school_id, reporter_id, reporter_role, category, description,
+            report_id, school_id, reporter_id, reporter_role, category, title, description,
             submitted_time, latitude, longitude, status, verification_status,
             verification_confidence, dangerous_school_status,
             photo_evidence_available, gps_location_available, uploaded_image_name,
-            resolution_deadline
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            uploaded_doc_name, uploaded_video_name, additional_remarks,
+            ai_verification_json, overall_consistency_score, evidence_confidence,
+            risk_score, risk_level, resolution_deadline, parent_issue_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
     issue_id = execute_query(
         query,
         (
-            report_id, school_id, reporter_id, reporter_role, analysis["category"], description,
-            submitted_time, lat, lon, status, analysis["verification_status"],
-            10.0 if has_photo or has_gps else 0.0,  # Base confidence
-            dangerous_status,
-            1 if has_photo else 0,
-            1 if has_gps else 0,
-            photo_name if has_photo else None,
-            resolution_deadline
+            report_id, school_id, reporter_id, reporter_role, analysis["category"],
+            title or description[:40], description, submitted_time, lat, lon, status,
+            f"Consistency: {cross['overall_consistency_score']}% ({cross['risk_level']} Risk)",
+            float(cross["overall_consistency_score"]), dangerous_status,
+            1 if (has_photo or photo_name) else 0,
+            1 if (has_gps or lat != "None") else 0,
+            photo_name if photo_name else None,
+            doc_name if doc_name else None,
+            video_name if video_name else None,
+            additional_remarks if additional_remarks else None,
+            json.dumps(cross),
+            float(cross["overall_consistency_score"]),
+            float(cross["evidence_confidence"]),
+            float(cross["risk_score"]),
+            cross["risk_level"],
+            resolution_deadline,
+            parent_id
         ),
         fetch="lastrowid"
     )
 
-    # 7. Add evidence record if photo submitted
-    if has_photo and photo_name:
+    # 8. Add evidence record if photo submitted
+    if (has_photo or photo_name) and photo_name:
         execute_query(
             """
             INSERT INTO issue_evidence (issue_id, stage, photo_name, description, timestamp, reporter_id)
@@ -108,36 +132,91 @@ def create_issue(school_id: int, reporter_id: int, reporter_role: str,
             (issue_id, photo_name, submitted_time, reporter_id)
         )
 
-    # 8. Trigger alert notifications for urgent or emergency situations
-    if dangerous_status == 1:
+    # 9. Trigger alert notifications for urgent or emergency situations
+    if dangerous_status == 1 or cross["risk_level"] in ["HIGH", "CRITICAL"]:
         create_notification(
             user_id=None,
             role_target="District Education Officer",
-            message=f"🚨 EMERGENCY: Unsafe {analysis['category']} reported at {school['name']} (ID: {report_id}).",
+            message=f"🚨 EMERGENCY ALERT: Unsafe {analysis['category']} reported at {school['name']} (ID: {report_id}). Risk: {cross['risk_level']}.",
             notify_type="Emergency",
             issue_id=issue_id
         )
 
-    # 9. Audit log entry
+    # 10. Audit log entry
     log_audit_event(
         user_id=reporter_id,
         action="SUBMIT_REPORT",
         entity_type="issue",
         entity_id=report_id,
-        new_value=status
+        new_value=f"{status} (Consistency: {cross['overall_consistency_score']}% Goal)"
     )
 
     return {
         "id": issue_id,
         "report_id": report_id,
+        "title": title or description[:40],
         "category": analysis["category"],
         "priority_level": priority_level,
         "priority_score": analysis["priority_score"],
         "recommended_action": analysis["recommended_action"],
         "officer_summary": analysis["officer_summary"],
         "is_duplicate": is_duplicate,
-        "parent_report_id": parent_id
+        "parent_report_id": parent_id,
+        "cross_verification": cross
     }
+
+
+def record_officer_decision(issue_id: int, officer_id: int, decision: str, remarks: str = "") -> bool:
+    """
+    Saves a government officer's formal review decision and remarks on a report.
+    Decisions: 'Accept', 'Reject', 'Request Clarification', 'Assign Inspection', 'Escalate', 'Mark Resolved'
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    status_mapping = {
+        "Accept": "VERIFIED",
+        "Reject": "REJECTED",
+        "Request Clarification": "UNDER_REVIEW",
+        "Assign Inspection": "INSPECTION_REQUIRED",
+        "Escalate": "ESCALATED",
+        "Mark Resolved": "CLOSED"
+    }
+    new_status = status_mapping.get(decision, "UNDER_REVIEW")
+
+    issue = execute_query("SELECT report_id, status FROM issues WHERE id = ?;", (issue_id,), fetch="one")
+    if not issue:
+        return False
+
+    prev_status = issue["status"]
+
+    execute_query(
+        """
+        UPDATE issues 
+        SET status = ?, officer_decision = ?, officer_remarks = ?, officer_decision_time = ?
+        WHERE id = ?;
+        """,
+        (new_status, decision, remarks, timestamp, issue_id),
+        fetch="rowcount"
+    )
+
+    log_audit_event(
+        user_id=officer_id,
+        action=f"OFFICER_DECISION_{decision.upper().replace(' ', '_')}",
+        entity_type="issue",
+        entity_id=issue["report_id"],
+        prev_value=prev_status,
+        new_value=f"{decision} ({new_status}): {remarks[:50]}"
+    )
+
+    create_notification(
+        user_id=None,
+        role_target="Headmaster",
+        message=f"📋 Government Decision on {issue['report_id']}: {decision}. Remarks: {remarks[:60]}",
+        notify_type="Info",
+        issue_id=issue_id
+    )
+
+    return True
 
 def check_for_duplicate(school_id: int, category: str, description: str) -> tuple:
     """
@@ -158,7 +237,7 @@ def check_for_duplicate(school_id: int, category: str, description: str) -> tupl
         words_new = set(description.lower().split())
         overlap = words_existing.intersection(words_new)
         if len(overlap) > 0 and (len(overlap) / max(len(words_new), 1)) > 0.3:
-            return True, issue["report_id"]
+            return True, issue["id"]  # Return integer PK, not string report_id (FK must be INTEGER)
     return False, None
 
 

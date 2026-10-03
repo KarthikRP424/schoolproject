@@ -121,49 +121,198 @@ def render_school_dashboard(user_profile: dict):
             plot_historical_scores(score_recs)
 
     # ═════════════════════════════════════════════════════════════════════════
-    # TAB 2: SUBMIT ISSUE REPORT
+    # TAB 2: SUBMIT EVIDENCE-DRIVEN ISSUE REPORT (SIH26095)
     # ═════════════════════════════════════════════════════════════════════════
     with tab_report:
-        st.subheader("📝 Report School Facility Deficit")
-        st.write("Submit plumbing, electricity, teacher, or structural issues directly to district education officers.")
+        st.subheader("📝 Evidence-Driven Problem Reporting & AI Cross-Verification")
+        st.caption("Submit multi-source evidence (Photos, Documents, GPS, Video) for instant AI cross-consistency audit before government authority review.")
 
-        with st.form("school_reporting_form"):
-            issue_cat = st.selectbox("Issue Category", [
-                "Sanitation", "Drinking Water", "Teacher Shortage", "Infrastructure", "Electricity", "General Issue"
-            ])
-            issue_desc = st.text_area("Issue Description", placeholder="Be detailed. State what is broken and who is affected...")
-            
-            st.markdown("**Evidence Upload (Simulation)**")
-            up_col1, up_col2 = st.columns(2)
-            with up_col1:
-                photo_file = st.file_uploader("Upload Evidence Photo", type=["jpg", "png", "jpeg"])
-                has_photo = photo_file is not None
-            with up_col2:
-                gps_input = st.text_input("GPS Coordinates (Latitude, Longitude)", value=f"{school['latitude']}, {school['longitude']}")
-                has_gps = len(gps_input.strip()) > 0
+        # ── HACKATHON DEMO PRESET LOADER ─────────────────────────────────────
+        with st.expander("🧪 Hackathon Demo Presets — Load Pre-Configured Test Cases", expanded=False):
+            preset = st.selectbox(
+                "Select Test Case Scenario for Judge Demo:",
+                [
+                    "Custom Manual Input",
+                    "Sample 1: Genuine / Consistent Report (High 92% Consistency)",
+                    "Sample 2: Inconsistent Report (Text ↔ Document Mismatch)",
+                    "Sample 3: Incomplete Document Report (Missing Authorization Stamp)",
+                    "Sample 4: Recurring Issue Report (Increased Risk History)",
+                    "Sample 5: High-Risk Location Mismatch (14.5km GPS Boundary Breach)"
+                ]
+            )
 
-            form_submit = st.form_submit_button("🔍 Submit to Department")
+        # Preset default values
+        default_cat = "Sanitation"
+        default_title = ""
+        default_desc = ""
+        default_photo = ""
+        default_doc = ""
+        default_gps = f"{school['latitude']}, {school['longitude']}"
+        default_remarks = ""
+
+        if preset == "Sample 1: Genuine / Consistent Report (High 92% Consistency)":
+            default_cat = "Drinking Water"
+            default_title = "Drinking Water Purification Plant Failure"
+            default_desc = "The main drinking water purification plant filter unit is damaged and leaking mud water into storage tanks."
+            default_photo = "water_purifier_leak.jpg"
+            default_doc = "rampura_water_maintenance_log.pdf"
+            default_remarks = "Plumber inspected yesterday and recommended urgent membrane replacement."
+
+        elif preset == "Sample 2: Inconsistent Report (Text ↔ Document Mismatch)":
+            default_cat = "Electricity"
+            default_title = "Classroom Wiring Short Circuit Outage"
+            default_desc = "Electrical wiring short circuit in Class 7 room at Rampura Primary School."
+            default_photo = "electrical_wiring.jpg"
+            default_doc = "invoice_other_school_b.pdf"
+            default_remarks = "Uploaded maintenance invoice references School B in Bhadravathi instead of Rampura Primary."
+
+        elif preset == "Sample 3: Incomplete Document Report (Missing Authorization Stamp)":
+            default_cat = "Sanitation"
+            default_title = "Primary Washroom Drainage Blockage"
+            default_desc = "Boys student washroom drainage pipeline completely blocked requiring emergency plumbing audit."
+            default_photo = "toilet_blockage.jpg"
+            default_doc = "draft_contract_no_stamp.pdf"
+            default_remarks = "Document submitted is a draft work order lacking official reference date and seal."
+
+        elif preset == "Sample 4: Recurring Issue Report (Increased Risk History)":
+            default_cat = "Sanitation"
+            default_title = "Recurrent Toilet Pipeline Overflow"
+            default_desc = "Washroom pipeline overflowing again after partial repair attempt last fortnight."
+            default_photo = "toilet_pipe_leak.jpg"
+            default_doc = "plumbing_history_log.pdf"
+            default_remarks = "Same category issue was logged 14 days ago; problem remains unresolved."
+
+        elif preset == "Sample 5: High-Risk Location Mismatch (14.5km GPS Boundary Breach)":
+            default_cat = "Infrastructure"
+            default_title = "Playground Wall Structural Cracks"
+            default_desc = "Concrete cracks opened on school boundary wall near playground threat of collapse."
+            default_photo = "wall_crack_distant.jpg"
+            default_doc = "civil_report.pdf"
+            default_gps = "14.0500, 75.9000"
+            default_remarks = "Submitted GPS location is 14.5 km away from registered school coordinates."
+
+        # ── 8-STEP REPORTING FORM ───────────────────────────────────────────
+        with st.form("evidence_reporting_form"):
+            st.markdown("#### 📍 Step 1: Institution Context")
+            st.info(f"**Institution:** {school['name']} | **ID:** `SCH-{school['id']}` | **Taluk:** {school['taluk']} | **District:** {school['district']}")
+
+            st.markdown("#### 🏷️ Step 2: Problem Category & Title")
+            c1, c2 = st.columns([0.4, 0.6])
+            with c1:
+                categories = ["Sanitation", "Drinking Water", "Teacher Shortage", "Infrastructure", "Electricity", "General Issue"]
+                cat_idx = categories.index(default_cat) if default_cat in categories else 0
+                issue_cat = st.selectbox("Problem Category *", categories, index=cat_idx)
+            with c2:
+                issue_title = st.text_input("Problem Title *", value=default_title, placeholder="e.g. Washroom Plumbing Blockage")
+
+            st.markdown("#### 📝 Step 3: Detailed Description & Remarks")
+            issue_desc = st.text_area("Detailed Problem Description *", value=default_desc, placeholder="Provide complete details on what is broken, severity, and impacted students...")
+            add_remarks = st.text_input("Additional Remarks / Context", value=default_remarks, placeholder="e.g. Prior repair attempts, urgency notes...")
+
+            st.markdown("#### 📷 Step 4: Multi-Source Evidence Upload")
+            up1, up2, up3 = st.columns(3)
+            with up1:
+                photo_file = st.file_uploader("1. Photo Evidence", type=["jpg", "png", "jpeg"])
+                sim_photo = st.text_input("Or Simulated Photo Filename", value=default_photo)
+            with up2:
+                doc_file = st.file_uploader("2. Maintenance Document / PDF", type=["pdf", "txt", "png", "jpg"])
+                sim_doc = st.text_input("Or Supporting Doc Filename", value=default_doc)
+            with up3:
+                video_file = st.file_uploader("3. Video Evidence (Optional)", type=["mp4", "mov"])
+                sim_video = st.text_input("Or Video Filename", value="")
+
+            st.markdown("#### 🌐 Step 5: Capture / Select GPS Location")
+            gps_input = st.text_input("GPS Coordinates (Latitude, Longitude) *", value=default_gps)
+
+            st.markdown("---")
+            form_submit = st.form_submit_button("🚀 Step 6: Submit Report & Execute AI Cross-Verification", type="primary", use_container_width=True)
 
         if form_submit:
             if not issue_desc.strip():
-                st.error("Please provide a description of the issue.")
+                st.error("Please provide a detailed problem description before submitting.")
             else:
-                p_name = photo_file.name if has_photo else ""
+                p_name = photo_file.name if photo_file else sim_photo.strip()
+                d_name = doc_file.name if doc_file else sim_doc.strip()
+                v_name = video_file.name if video_file else sim_video.strip()
+                has_p = bool(p_name)
+                has_g = len(gps_input.strip()) > 0
+
+                # Execute Issue Creation & AI Cross-Verification
                 res = create_issue(
                     school_id=school_id,
                     reporter_id=user_profile["id"],
                     reporter_role=user_profile["role"],
                     description=issue_desc.strip(),
-                    has_photo=has_photo,
-                    has_gps=has_gps,
+                    has_photo=has_p,
+                    has_gps=has_g,
                     gps_coords=gps_input.strip(),
-                    photo_name=p_name
+                    photo_name=p_name,
+                    title=issue_title.strip() or issue_desc[:40],
+                    doc_name=d_name,
+                    video_name=v_name,
+                    additional_remarks=add_remarks.strip()
                 )
-                
-                st.success("Report submitted successfully and sent to Government Officer dashboard.")
-                st.info(f"📋 **Generated Report ID:** `{res['report_id']}`")
-                if res["is_duplicate"]:
-                    st.warning(f"⚠️ Possible Duplicate Warning: This issue resembles RPT-`{res['parent_report_id']}` already logged.")
+
+                cross = res["cross_verification"]
+
+                st.balloons()
+                st.success(f"✅ **Report Submitted Successfully!** Generated Unique ID: `{res['report_id']}`")
+
+                # ── STEP 7 & 8: AI MULTI-SOURCE CROSS-VERIFICATION CARD ───────
+                st.markdown("### 🤖 Step 7 & 8: AI Multi-Source Cross-Verification Audit Result")
+
+                # Top Metric Summary Cards
+                mc1, mc2, mc3, mc4 = st.columns(4)
+                with mc1:
+                    score = cross["overall_consistency_score"]
+                    st.metric("Overall Consistency", f"{score}%", help="Weighted internal consistency across Text, Image, Document, and Location.")
+                with mc2:
+                    st.metric("Evidence Confidence", f"{cross['evidence_confidence']}%", help="Confidence level based on multi-source coverage.")
+                with mc3:
+                    st.metric("Risk Score", f"{cross['risk_score']}/100")
+                with mc4:
+                    r_color = {"CRITICAL": "🔴", "HIGH": "🟧", "MEDIUM": "🨨", "LOW": "🟩"}.get(cross["risk_level"], "⚪")
+                    st.metric("Risk Level", f"{r_color} {cross['risk_level']}")
+
+                st.progress(score / 100.0)
+
+                # Individual Check Cards
+                st.markdown("#### 🔍 AI Check Breakdown")
+                chk = cross["checks"]
+
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    t_doc = chk["text_document"]
+                    c_badge = "✅ CONSISTENT" if t_doc["status"] == "CONSISTENT" else "⚠️ INCOMPLETE" if t_doc["status"] == "INCOMPLETE" else "❌ INCONSISTENT" if t_doc["status"] == "INCONSISTENT" else "⚪ UNKNOWN"
+                    st.markdown(f"**Check 1: Text ↔ Document Consistency:** {c_badge} (`{t_doc['score']}%`)")
+                    st.caption(f"Reason: {t_doc['reason']}")
+
+                    t_img = chk["text_image"]
+                    i_badge = "✅ CONSISTENT" if t_img["status"] == "CONSISTENT" else "📷 INSUFFICIENT" if t_img["status"] == "INSUFFICIENT_EVIDENCE" else "❌ INCONSISTENT"
+                    st.markdown(f"**Check 2: Text ↔ Image Consistency:** {i_badge} (`{t_img['score']}%`)")
+                    st.caption(f"Reason: {t_img['reason']}")
+
+                with col_b:
+                    t_loc = chk["location"]
+                    l_badge = "✅ MATCH" if t_loc["status"] == "MATCH" else "🚨 MISMATCH" if t_loc["status"] == "MISMATCH" else "⚪ UNKNOWN"
+                    st.markdown(f"**Check 4: Location Consistency:** {l_badge} (`{t_loc['score']}%`)")
+                    st.caption(f"Reason: {t_loc['reason']}")
+
+                    t_hist = chk["historical"]
+                    h_badge = "🚨 RECURRING ISSUE" if t_hist["recurring_issue"] else "🔁 DUPLICATE" if t_hist["duplicate"] else "✅ FIRST REPORT"
+                    st.markdown(f"**Check 5: Historical Report Cross-Check:** {h_badge}")
+                    st.caption(f"Reason: {t_hist['reason']}")
+
+                # Key Findings & Recommended Action
+                st.markdown("#### 💡 AI Findings & Recommended Government Action")
+                if cross["contradictions"]:
+                    st.warning(f"⚠️ **Detected Contradictions / Flags:** {', '.join(cross['contradictions'])}")
+                if cross["detected_issues"]:
+                    st.info(f"🔍 **Detected Issues:** {', '.join(cross['detected_issues'])}")
+
+                st.success(f"🎯 **Recommended Action:** {cross['recommended_action']}")
+                if cross["requires_human_review"]:
+                    st.warning("⚠️ **Human Review Flagged:** Low consistency score or evidence mismatch detected. Assigned for Government Officer Review.")
 
     # ═════════════════════════════════════════════════════════════════════════
     # TAB 3: VERIFY & CONFIRM OPEN ISSUES
