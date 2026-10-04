@@ -92,13 +92,13 @@ def render_district_dashboard(user_profile: dict):
             f_taluk, f_priority, f_status = st.columns(3)
             with f_taluk:
                 tal_opts = ["All"] + sorted(df_issues["taluk"].unique().tolist())
-                sel_tal = st.selectbox("Filter Taluk", tal_opts)
+                sel_tal = st.selectbox("Filter Taluk", tal_opts, key="dist_filter_taluk")
             with f_priority:
                 pri_opts = ["All"] + sorted(df_issues["priority_level"].unique().tolist())
-                sel_pri = st.selectbox("Filter Priority", pri_opts)
+                sel_pri = st.selectbox("Filter Priority", pri_opts, key="dist_filter_priority")
             with f_status:
                 stat_opts = ["All"] + sorted(df_issues["status"].unique().tolist())
-                sel_stat = st.selectbox("Filter Status", stat_opts)
+                sel_stat = st.selectbox("Filter Status", stat_opts, key="dist_filter_status")
                 
             filtered_df = df_issues.copy()
             if sel_tal != "All":
